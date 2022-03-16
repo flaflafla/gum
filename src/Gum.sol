@@ -22,6 +22,10 @@ contract Gum is ERC20, Ownable {
         marketplace = _marketplace;
     }
 
+    function updateStaking(address _staking) public onlyOwner {
+        staking = _staking;
+    }
+
     function mint(address to, uint256 amount) public onlyOwnerOrStaking {
         _mint(to, amount);
     }

@@ -5,7 +5,7 @@ import "ds-test/test.sol";
 import "../Gum.sol";
 
 interface CheatCodes {
-  function prank(address) external;
+    function prank(address) external;
 }
 
 contract GumTest is DSTest {
@@ -18,6 +18,7 @@ contract GumTest is DSTest {
     address SPENDER_ADDRESS = address(4);
     address RANDO_ADDRESS = address(5);
     address NEW_MARKETPLACE_ADDRESS = address(6);
+    address NEW_STAKING_ADDRESS = address(7);
 
     function setUp() public {
         gumContract = new Gum(MARKETPLACE_ADDRESS, STAKING_ADDRESS);
@@ -61,6 +62,19 @@ contract GumTest is DSTest {
     function testFailUpdateMarketplace() public {
         cheats.prank(RANDO_ADDRESS);
         gumContract.updateMarkeplace(NEW_MARKETPLACE_ADDRESS);
+    }
+
+    function testUpdateStaking() public {
+        address oldStaking = gumContract.staking();
+        assertEq(oldStaking, STAKING_ADDRESS);
+        gumContract.updateStaking(NEW_STAKING_ADDRESS);
+        address newStaking = gumContract.staking();
+        assertEq(newStaking, NEW_STAKING_ADDRESS);
+    }
+
+    function testFailUpdateStaking() public {
+        cheats.prank(RANDO_ADDRESS);
+        gumContract.updateStaking(NEW_STAKING_ADDRESS);
     }
 
     function testMarketplaceTransferFrom() public {
