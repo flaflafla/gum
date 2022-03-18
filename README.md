@@ -4,4 +4,4 @@
 
 `src/Gum.sol`
 
-deployed/verified on kovan testnet at [0xD52fbdD87a75b844F85BFF42F48ec8Aa5Fd4082F](https://kovan.etherscan.io/address/0xd52fbdd87a75b844f85bff42f48ec8aa5fd4082f#code)
+deployed/verified on kovan testnet at [0xe5f1433b6eCc6bE74E413b54f4c1eA2671b1cA0F](https://kovan.etherscan.io/address/0xe5f1433b6ecc6be74e413b54f4c1ea2671b1ca0f#code)
