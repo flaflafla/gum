@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.10;
+pragma solidity 0.8.13;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -8,22 +8,27 @@ contract Gum is ERC20, Ownable {
     address public marketplace;
     address public staking;
 
+    event MarketplaceUpdated(address _marketplace);
+    event StakingUpdated(address _staking);
+
     constructor(address _marketplace, address _staking) ERC20("Gum", "GUM") {
         marketplace = _marketplace;
         staking = _staking;
     }
 
     modifier onlyOwnerOrStaking() {
-        require(msg.sender == owner() || msg.sender == staking);
+        require(msg.sender == owner() || msg.sender == staking, "only owner or staking can call");
         _;
     }
 
     function updateMarkeplace(address _marketplace) public onlyOwner {
         marketplace = _marketplace;
+        emit MarketplaceUpdated(_marketplace);
     }
 
     function updateStaking(address _staking) public onlyOwner {
         staking = _staking;
+        emit StakingUpdated(_staking);
     }
 
     function mint(address to, uint256 amount) public onlyOwnerOrStaking {
