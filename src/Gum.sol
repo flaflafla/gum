@@ -17,7 +17,10 @@ contract Gum is ERC20, Ownable {
     }
 
     modifier onlyOwnerOrStaking() {
-        require(msg.sender == owner() || msg.sender == staking, "only owner or staking can call");
+        require(
+            msg.sender == owner() || msg.sender == staking,
+            "only owner or staking can call"
+        );
         _;
     }
 
@@ -31,6 +34,9 @@ contract Gum is ERC20, Ownable {
         emit StakingUpdated(_staking);
     }
 
+    /**
+     * @dev Only owner and staking contract can mint tokens.
+     */
     function mint(address to, uint256 amount) public onlyOwnerOrStaking {
         _mint(to, amount);
     }
