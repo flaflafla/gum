@@ -27,30 +27,38 @@ contract Staking is ERC721Holder, Ownable {
 
     bool public started;
 
-    mapping(address => mapping(BGContract => EnumerableSet.UintSet)) private _deposits;
+    mapping(address => mapping(BGContract => EnumerableSet.UintSet))
+        private _deposits;
     mapping(BGContract => mapping(uint256 => uint256)) public depositBlocks;
     uint256 public stakeRewardRate;
 
-    mapping(address => mapping(BGContract => EnumerableSet.UintSet)) private _locks;
+    mapping(address => mapping(BGContract => EnumerableSet.UintSet))
+        private _locks;
     mapping(BGContract => mapping(uint256 => uint256)) public lockBlocks;
 
     // duration is the index of lockBoostRates/lockDurationsConfig
-    mapping(BGContract => mapping(uint256 => uint256)) public lockDurationsByTokenId;
+    mapping(BGContract => mapping(uint256 => uint256))
+        public lockDurationsByTokenId;
     uint256[5] public lockDurationsConfig = [0, 30, 90, 180, 365]; // in days
     uint256[5] public lockBoostRates; // decimals == 3
 
     event GumTokenUpdated(address _gumToken);
     event Started();
     event Stopped();
-    event Deposited(address from, uint256[] tokenIds, BGContract[] bgContracts);
+    event Deposited(address from, uint256[] tokenIds, uint8[] bgContracts);
     event Withdrawn(address to, uint256[] tokenIds);
     event StakeRewardRateUpdated(uint256 _stakeRewardRate);
-    event Locked(address from, uint256[] tokenIds, uint256[] durations, BGContract[] bgContracts);
+    event Locked(
+        address from,
+        uint256[] tokenIds,
+        uint256[] durations,
+        uint8[] bgContracts
+    );
     event DepositedAndLocked(
         address from,
         uint256[] tokenIds,
         uint256[] durations,
-        BGContract[] bgContracts
+        uint8[] bgContracts
     );
     event LockBoostRatesUpdated(uint256 lockBoostRate, uint256 index);
     event RewardClaimed(address to, uint256 amount);
@@ -94,11 +102,13 @@ contract Staking is ERC721Holder, Ownable {
         IGum(gumToken).mint(to, amount);
     }
 
-    function getRate(address account, uint256 tokenId, BGContract bgContract)
-        internal
-        returns (uint256)
-    {
+    function getRate(
+        address account,
+        uint256 tokenId,
+        uint8 _bgContract
+    ) internal returns (uint256) {
         uint256 boost = 1000;
+        BGContract bgContract = BGContract(_bgContract);
         if (_locks[account][bgContract].contains(tokenId)) {
             uint256 duration = lockDurationsConfig[
                 lockDurationsByTokenId[bgContract][tokenId]
@@ -117,18 +127,30 @@ contract Staking is ERC721Holder, Ownable {
                 10**uint256(IGum(gumToken).decimals())) * boost) / 1000;
     }
 
-    function calculateRewards(address account, uint256[] memory tokenIds, BGContract[] calldata bgContracts)
-        public
-        returns (uint256[] memory rewards)
-    {
+    function calculateRewards(
+        address account,
+        uint256[] memory tokenIds,
+        uint8[] calldata bgContracts
+    ) public returns (uint256[] memory rewards) {
         rewards = new uint256[](tokenIds.length);
         for (uint256 i; i < tokenIds.length; i++) {
             uint256 rate = getRate(account, tokenIds[i], bgContracts[i]);
-            rewards[i] = rate * (_deposits[account][bgContracts[i]].contains(tokenIds[i]) ? 1 : 0);
+            rewards[i] =
+                rate *
+                (
+                    _deposits[account][BGContract(bgContracts[i])].contains(
+                        tokenIds[i]
+                    )
+                        ? 1
+                        : 0
+                );
         }
     }
 
-    function claimRewards(uint256[] calldata tokenIds, BGContract[] calldata bgContracts) public {
+    function claimRewards(
+        uint256[] calldata tokenIds,
+        uint8[] calldata bgContracts
+    ) public {
         require(
             tokenIds.length == bgContracts.length,
             "argument lengths don't match"
@@ -137,8 +159,9 @@ contract Staking is ERC721Holder, Ownable {
         address to = msg.sender;
         uint256[] memory rewards = calculateRewards(to, tokenIds, bgContracts);
         for (uint256 i; i < tokenIds.length; i++) {
+            BGContract bgContract = BGContract(bgContracts[i]);
             amount += rewards[i];
-            depositBlocks[bgContracts[i]][tokenIds[i]] = block.number;
+            depositBlocks[bgContract][tokenIds[i]] = block.number;
         }
         if (amount > 0) {
             _reward(to, amount);
@@ -146,10 +169,9 @@ contract Staking is ERC721Holder, Ownable {
         }
     }
 
-    function deposit(
-        uint256[] calldata tokenIds,
-        BGContract[] calldata bgContracts
-    ) external {
+    function deposit(uint256[] calldata tokenIds, uint8[] calldata bgContracts)
+        external
+    {
         require(started, "not started");
         require(
             tokenIds.length == bgContracts.length,
@@ -158,7 +180,7 @@ contract Staking is ERC721Holder, Ownable {
         address account = msg.sender;
         for (uint256 i; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
-            BGContract bgContract = bgContracts[i];
+            BGContract bgContract = BGContract(bgContracts[i]);
             address nftAddress;
             if (bgContract == BGContract.BGK) {
                 nftAddress = BGK;
@@ -179,7 +201,9 @@ contract Staking is ERC721Holder, Ownable {
         emit Deposited(account, tokenIds, bgContracts);
     }
 
-    function withdraw(uint256[] calldata tokenIds, BGContract[] calldata bgContracts) external {
+    function withdraw(uint256[] calldata tokenIds, uint8[] calldata bgContracts)
+        external
+    {
         claimRewards(tokenIds, bgContracts);
         address account = msg.sender;
         require(
@@ -188,7 +212,7 @@ contract Staking is ERC721Holder, Ownable {
         );
         for (uint256 i; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
-            BGContract bgContract = bgContracts[i];
+            BGContract bgContract = BGContract(bgContracts[i]);
             require(
                 _deposits[account][bgContract].contains(tokenId),
                 "token not deposited"
@@ -212,22 +236,30 @@ contract Staking is ERC721Holder, Ownable {
             } else {
                 revert("couldn't get nft contract address");
             }
-            IERC721(nftAddress).safeTransferFrom(address(this), account, tokenId, "");
+            IERC721(nftAddress).safeTransferFrom(
+                address(this),
+                account,
+                tokenId,
+                ""
+            );
         }
     }
 
-    // TODO: split into two functions?
     function depositsOf(address account)
         external
         view
         returns (uint256[][2] memory)
     {
-        EnumerableSet.UintSet storage bgkDepositSet = _deposits[account][BGContract.BGK];
+        EnumerableSet.UintSet storage bgkDepositSet = _deposits[account][
+            BGContract.BGK
+        ];
         uint256[] memory bgkIds = new uint256[](bgkDepositSet.length());
         for (uint256 i; i < bgkDepositSet.length(); i++) {
             bgkIds[i] = bgkDepositSet.at(i);
         }
-        EnumerableSet.UintSet storage bgpDepositSet = _deposits[account][BGContract.BGP];
+        EnumerableSet.UintSet storage bgpDepositSet = _deposits[account][
+            BGContract.BGP
+        ];
         uint256[] memory bgpIds = new uint256[](bgpDepositSet.length());
         for (uint256 i; i < bgpDepositSet.length(); i++) {
             bgpIds[i] = bgpDepositSet.at(i);
@@ -235,19 +267,22 @@ contract Staking is ERC721Holder, Ownable {
         return [bgkIds, bgpIds];
     }
 
-    function lock(uint256[] calldata tokenIds, uint256[] calldata durations, BGContract[] calldata bgContracts)
-        external
-    {
+    function lock(
+        uint256[] calldata tokenIds,
+        uint256[] calldata durations,
+        uint8[] calldata bgContracts
+    ) external {
         require(started, "not started");
         require(
-            tokenIds.length == durations.length && tokenIds.length == bgContracts.length,
+            tokenIds.length == durations.length &&
+                tokenIds.length == bgContracts.length,
             "token ids don't match durations"
         );
         claimRewards(tokenIds, bgContracts);
         address account = msg.sender;
         for (uint256 i; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
-            BGContract bgContract = bgContracts[i];
+            BGContract bgContract = BGContract(bgContracts[i]);
             require(
                 _deposits[account][bgContract].contains(tokenId),
                 "token not deposited"
@@ -259,14 +294,21 @@ contract Staking is ERC721Holder, Ownable {
         emit Locked(account, tokenIds, durations, bgContracts);
     }
 
-    // TODO: split into two functions?
-    function locksOf(address account) external view returns (uint256[][2] memory) {
-        EnumerableSet.UintSet storage bgkLockSet = _locks[account][BGContract.BGK];
+    function locksOf(address account)
+        external
+        view
+        returns (uint256[][2] memory)
+    {
+        EnumerableSet.UintSet storage bgkLockSet = _locks[account][
+            BGContract.BGK
+        ];
         uint256[] memory bgkIds = new uint256[](bgkLockSet.length());
         for (uint256 i; i < bgkLockSet.length(); i++) {
             bgkIds[i] = bgkLockSet.at(i);
         }
-        EnumerableSet.UintSet storage bgpLockSet = _locks[account][BGContract.BGP];
+        EnumerableSet.UintSet storage bgpLockSet = _locks[account][
+            BGContract.BGP
+        ];
         uint256[] memory bgpIds = new uint256[](bgpLockSet.length());
         for (uint256 i; i < bgpLockSet.length(); i++) {
             bgpIds[i] = bgpLockSet.at(i);
@@ -277,7 +319,7 @@ contract Staking is ERC721Holder, Ownable {
     function depositAndLock(
         uint256[] calldata tokenIds,
         uint256[] calldata durations,
-        BGContract[] calldata bgContracts
+        uint8[] calldata bgContracts
     ) external {
         require(started, "not started");
         require(
@@ -288,8 +330,11 @@ contract Staking is ERC721Holder, Ownable {
         address account = msg.sender;
         for (uint256 i; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
-            BGContract bgContract = bgContracts[i];
-            require(!_locks[account][bgContract].contains(tokenId), "token already locked");
+            BGContract bgContract = BGContract(bgContracts[i]);
+            require(
+                !_locks[account][bgContract].contains(tokenId),
+                "token already locked"
+            );
             require(
                 !_deposits[account][bgContract].contains(tokenId),
                 "token already deposited"
