@@ -1,15 +1,25 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
+import "./console.sol";
 import "ds-test/test.sol";
 import "../Staking.sol";
 
 interface CheatCodes {
     function prank(address) external;
+
+    function startPrank(address, address) external;
+
+    function stopPrank() external;
 }
 
 interface BGK {
     function approve(address to, uint256 tokenId) external;
+
+    function isApprovedForAll(address owner, address operator)
+        external
+        view
+        returns (bool approved);
 
     function setApprovalForAll(address operator, bool _approved) external;
 
@@ -71,8 +81,9 @@ contract GumTest is DSTest {
         cheats.prank(WHALE);
         kids.setApprovalForAll(TRANSFER_ADDRESS, true);
 
+        cheats.startPrank(TRANSFER_ADDRESS, TRANSFER_ADDRESS);
+
         for (uint256 i = 0; i < 12; i++) {
-            cheats.prank(TRANSFER_ADDRESS);
             kids.safeTransferFrom(WHALE, USER_ADDRESS, kidsIds[i]);
         }
 
@@ -95,23 +106,36 @@ contract GumTest is DSTest {
         pups.setApprovalForAll(TRANSFER_ADDRESS, true);
 
         for (uint256 i = 0; i < 12; i++) {
-            cheats.prank(TRANSFER_ADDRESS);
             pups.safeTransferFrom(WHALE, USER_ADDRESS, pupsIds[i]);
         }
+
+        cheats.stopPrank();
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+        kids.setApprovalForAll(address(stakingContract), true);
+        pups.setApprovalForAll(address(stakingContract), true);
+        cheats.stopPrank();
     }
 
     function testDeposit() public {
-        // stakingContract.start();
-        // cheats.prank(USER_ADDRESS);
-        // uint256[] memory tokenIds = new uint256[](3);
-        // tokenIds[0] = 4245;
-        // tokenIds[1] = 4224;
-        // tokenIds[2] = 579;
-        // uint8[] memory bgContracts = new uint8[](3);
-        // tokenIds[0] = 0;
-        // tokenIds[1] = 0;
-        // tokenIds[2] = 0;
-        // broken -- needs approval
-        // stakingContract.deposit(tokenIds, bgContracts);
+        stakingContract.start();
+
+        uint256[] memory tokenIds = new uint256[](3);
+        tokenIds[0] = 4245;
+        tokenIds[1] = 4224;
+        tokenIds[2] = 9898;
+
+        uint8[] memory bgContracts = new uint8[](3);
+        bgContracts[0] = 0;
+        bgContracts[1] = 0;
+        bgContracts[2] = 1;
+
+        cheats.prank(USER_ADDRESS);
+        stakingContract.deposit(tokenIds, bgContracts);
+
+        uint256[][2] memory deposits = stakingContract.depositsOf(USER_ADDRESS);
+        assertEq(deposits[0][0], 4245);
+        assertEq(deposits[0][1], 4224);
+        assertEq(deposits[1][0], 9898);
     }
 }
