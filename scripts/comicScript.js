@@ -5,8 +5,15 @@ const pgp = require("pg-promise")();
 const kidsAbi = require("./abis/kids.json");
 const pupsAbi = require("./abis/pups.json");
 
-const { DATABASE_URL, RPC_URL } = process.env;
-const db = pgp(DATABASE_URL);
+const { DEV_DATABASE_URL, DATABASE_URL, RPC_URL } = process.env;
+const prodDbOptions = {
+  connectionString: DATABASE_URL,
+  max: 20,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+};
+const db = pgp(DEV_DATABASE_URL || prodDbOptions);
 const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
 const kidsAddress = "0xa5ae87B40076745895BB7387011ca8DE5fde37E0";
 const pupsAddress = "0x86e9C5ad3D4b5519DA2D2C19F5c71bAa5Ef40933";
