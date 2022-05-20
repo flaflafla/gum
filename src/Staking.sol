@@ -6,6 +6,8 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+import "./test/console.sol";
+
 interface IGum {
     function mint(address, uint256) external;
 
@@ -39,7 +41,7 @@ contract Staking is ERC721Holder, Ownable {
     // duration is the index of lockBoostRates/lockDurationsConfig
     mapping(BGContract => mapping(uint256 => uint256))
         public lockDurationsByTokenId;
-    uint256[5] public lockDurationsConfig = [0, 30, 90, 180, 365]; // in days
+    uint256[5] public lockDurationsConfig; // in days
     uint256[5] public lockBoostRates; // decimals == 3
 
     event GumTokenUpdated(address _gumToken);
@@ -61,11 +63,13 @@ contract Staking is ERC721Holder, Ownable {
         uint8[] bgContracts
     );
     event LockBoostRatesUpdated(uint256 lockBoostRate, uint256 index);
+    event LockDurationsConfigUpdated(uint256 lockDuration, uint256 index);
     event RewardClaimed(address to, uint256 amount);
 
     constructor(address _gumToken) {
         gumToken = _gumToken;
-        lockBoostRates = [1000, 1100, 1200, 1500, 2000];
+        lockBoostRates = [1000, 1100, 1250, 1400];
+        lockDurationsConfig = [0, 30, 90, 180];
         stakeRewardRate = 1;
         started = false;
     }
@@ -91,6 +95,14 @@ contract Staking is ERC721Holder, Ownable {
     {
         lockBoostRates[index] = lockBoostRate;
         emit LockBoostRatesUpdated(lockBoostRate, index);
+    }
+
+    function updateLockDurationsConfig(uint256 lockDuration, uint256 index)
+        public
+        onlyOwner
+    {
+        lockDurationsConfig[index] = lockDuration;
+        emit LockDurationsConfigUpdated(lockDuration, index);
     }
 
     function updateStakeRewardRate(uint256 _stakeRewardRate) public onlyOwner {

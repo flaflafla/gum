@@ -3,6 +3,7 @@ pragma solidity 0.8.13;
 
 import "./console.sol";
 import "ds-test/test.sol";
+import "../Gum.sol";
 import "../Staking.sol";
 
 interface CheatCodes {
@@ -13,7 +14,7 @@ interface CheatCodes {
     function stopPrank() external;
 }
 
-interface BGK {
+interface IBGK {
     function approve(address to, uint256 tokenId) external;
 
     function isApprovedForAll(address owner, address operator)
@@ -21,6 +22,8 @@ interface BGK {
         view
         returns (bool approved);
 
+    function ownerOf(uint256 tokenId) external view returns (address);
+
     function setApprovalForAll(address operator, bool _approved) external;
 
     function safeTransferFrom(
@@ -32,9 +35,11 @@ interface BGK {
     function balanceOf(address owner) external view returns (uint256 balance);
 }
 
-interface BGP {
+interface IBGP {
     function approve(address to, uint256 tokenId) external;
 
+    function ownerOf(uint256 tokenId) external view returns (address);
+
     function setApprovalForAll(address operator, bool _approved) external;
 
     function safeTransferFrom(
@@ -46,22 +51,26 @@ interface BGP {
     function balanceOf(address owner) external view returns (uint256 balance);
 }
 
-contract GumTest is DSTest {
+contract StakingTest is DSTest {
     CheatCodes cheats = CheatCodes(HEVM_ADDRESS);
+    Gum gumContract;
     Staking stakingContract;
-    BGK kids;
-    BGP pups;
+    IBGK kids;
+    IBGP pups;
 
-    address GUM_TOKEN = address(1);
-    address USER_ADDRESS = address(2);
-    address TRANSFER_ADDRESS = address(3);
+    address USER_ADDRESS = address(1);
+    address TRANSFER_ADDRESS = address(2);
+    address MARKETPLACE_ADDRESS = address(3);
+    address STAKING_ADDRESS = address(4);
+    address RANDO_ADDRESS = address(5);
 
     address BGK_ADDR = address(0xa5ae87B40076745895BB7387011ca8DE5fde37E0);
     address BGP_ADDR = address(0x86e9C5ad3D4b5519DA2D2C19F5c71bAa5Ef40933);
     address WHALE = address(0x521bC9Bb5Ab741658e48eF578D291aEe05DbA358);
 
     function setUp() public {
-        stakingContract = new Staking(GUM_TOKEN);
+        gumContract = new Gum(MARKETPLACE_ADDRESS, STAKING_ADDRESS);
+        stakingContract = new Staking(address(gumContract));
 
         uint256[] memory kidsIds = new uint256[](12);
         kidsIds[0] = 4245;
@@ -77,7 +86,7 @@ contract GumTest is DSTest {
         kidsIds[10] = 3486;
         kidsIds[11] = 2994;
 
-        kids = BGK(BGK_ADDR);
+        kids = IBGK(BGK_ADDR);
         cheats.prank(WHALE);
         kids.setApprovalForAll(TRANSFER_ADDRESS, true);
 
@@ -101,7 +110,7 @@ contract GumTest is DSTest {
         pupsIds[10] = 3491;
         pupsIds[11] = 3490;
 
-        pups = BGP(BGP_ADDR);
+        pups = IBGP(BGP_ADDR);
         cheats.prank(WHALE);
         pups.setApprovalForAll(TRANSFER_ADDRESS, true);
 
@@ -115,11 +124,114 @@ contract GumTest is DSTest {
         kids.setApprovalForAll(address(stakingContract), true);
         pups.setApprovalForAll(address(stakingContract), true);
         cheats.stopPrank();
+
+        stakingContract.start();
+    }
+
+    function getTokenOwner(uint8 contractId, uint256 tokenId)
+        internal
+        view
+        returns (address)
+    {
+        if (contractId == 0) {
+            return kids.ownerOf(tokenId);
+        } else {
+            return pups.ownerOf(tokenId);
+        }
+    }
+
+    function testStartAndStop() public {
+        bool isStartedOne = stakingContract.started();
+        assertTrue(isStartedOne);
+        stakingContract.stop();
+        bool isStartedTwo = stakingContract.started();
+        assertTrue(!isStartedTwo);
+    }
+
+    // don't let non-owner start contract
+    function testFailStart() public {
+        stakingContract.stop();
+        cheats.startPrank(RANDO_ADDRESS, RANDO_ADDRESS);
+        stakingContract.start();
+        cheats.stopPrank();
+    }
+
+    // don't let non-owner stop contract
+    function testFailStop() public {
+        cheats.startPrank(RANDO_ADDRESS, RANDO_ADDRESS);
+        stakingContract.stop();
+        cheats.stopPrank();
+    }
+
+    function testUpdateGumToken() public {
+        address newGumToken = address(6);
+        stakingContract.updateGumToken(newGumToken);
+        address updatedGumToken = stakingContract.gumToken();
+        assertEq(newGumToken, updatedGumToken);
+    }
+
+    // don't let non-owner update gum token
+    function testFailUpdateGumToken() public {
+        cheats.startPrank(RANDO_ADDRESS, RANDO_ADDRESS);
+        stakingContract.updateGumToken(address(6));
+        cheats.stopPrank();
+    }
+
+    function testUpdateLockBoostRates() public {
+        uint256 newLockBoostRate = 10_000_000_000;
+        uint256 newLockBoostRateIndex = 0;
+        stakingContract.updateLockBoostRates(
+            newLockBoostRate,
+            newLockBoostRateIndex
+        );
+        uint256 updatedLockBoostRate = stakingContract.lockBoostRates(
+            newLockBoostRateIndex
+        );
+        assertEq(newLockBoostRate, updatedLockBoostRate);
+    }
+
+    // don't let non-owner update lock boost rates
+    function testFailUpdateLockBoostRates() public {
+        cheats.startPrank(RANDO_ADDRESS, RANDO_ADDRESS);
+        stakingContract.updateLockBoostRates(69_420, 0);
+        cheats.stopPrank();
+    }
+
+    function testUpdateLockDurationsConfig() public {
+        uint256 newLockDuration = 12;
+        uint256 newLockDurationIndex = 1;
+        stakingContract.updateLockDurationsConfig(
+            newLockDuration,
+            newLockDurationIndex
+        );
+        uint256 updatedLockDuration = stakingContract.lockDurationsConfig(
+            newLockDurationIndex
+        );
+        assertEq(newLockDuration, updatedLockDuration);
+    }
+
+    // don't let non-owner update the lock durations config
+    function testFailUpdateLockDurationsConfig() public {
+        cheats.startPrank(RANDO_ADDRESS, RANDO_ADDRESS);
+        stakingContract.updateLockDurationsConfig(666, 2);
+        cheats.stopPrank();
+    }
+
+    function testUpdateStakeRewardRate() public {
+        uint256 newStakeRewardRate = 2;
+        stakingContract.updateStakeRewardRate(newStakeRewardRate);
+        uint256 updatedStakeRewardRate = stakingContract.stakeRewardRate();
+        assertEq(newStakeRewardRate, updatedStakeRewardRate);
+    }
+
+    // don't let non-owner update stake reward rate
+    function testFailUpdateStakeRewardRate() public {
+        cheats.startPrank(RANDO_ADDRESS, RANDO_ADDRESS);
+        stakingContract.updateStakeRewardRate(2);
+        cheats.stopPrank();
     }
 
     function testDeposit() public {
-        stakingContract.start();
-
         uint256[] memory tokenIds = new uint256[](3);
         tokenIds[0] = 4245;
         tokenIds[1] = 4224;
@@ -130,6 +242,11 @@ contract GumTest is DSTest {
         bgContracts[1] = 0;
         bgContracts[2] = 1;
 
+        for (uint256 i; i < tokenIds.length; i++) {
+            address tokenOwner = getTokenOwner(bgContracts[i], tokenIds[i]);
+            assertEq(tokenOwner, USER_ADDRESS);
+        }
+
         cheats.prank(USER_ADDRESS);
         stakingContract.deposit(tokenIds, bgContracts);
 
@@ -137,5 +254,185 @@ contract GumTest is DSTest {
         assertEq(deposits[0][0], 4245);
         assertEq(deposits[0][1], 4224);
         assertEq(deposits[1][0], 9898);
+
+        for (uint256 i; i < tokenIds.length; i++) {
+            address tokenOwner = getTokenOwner(bgContracts[i], tokenIds[i]);
+            assertEq(tokenOwner, address(stakingContract));
+        }
     }
+
+    // don't let a user deposit a jpeg they don't own
+    function testFailDeposit() public {
+        uint256 someoneElsesToken = 1;
+
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = someoneElsesToken;
+
+        uint8[] memory bgContracts = new uint8[](1);
+        bgContracts[0] = 0;
+
+        cheats.prank(USER_ADDRESS);
+        stakingContract.deposit(tokenIds, bgContracts);
+    }
+
+    function testWithdraw() public {
+        // setup: deposit some jpegs
+        uint256[] memory depositTokenIds = new uint256[](3);
+        depositTokenIds[0] = 8177;
+        depositTokenIds[1] = 9003;
+        depositTokenIds[2] = 9717;
+
+        uint8[] memory depositBgContracts = new uint8[](3);
+        depositBgContracts[0] = 0;
+        depositBgContracts[1] = 1;
+        depositBgContracts[2] = 1;
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+        stakingContract.deposit(depositTokenIds, depositBgContracts);
+
+        // withdraw one of the jpegs
+        uint256[] memory firstWithdrawalTokenIds = new uint256[](1);
+        firstWithdrawalTokenIds[0] = depositTokenIds[0];
+
+        uint8[] memory firstWithdrawalBgContracts = new uint8[](1);
+        firstWithdrawalBgContracts[0] = depositBgContracts[0];
+
+        stakingContract.withdraw(
+            firstWithdrawalTokenIds,
+            firstWithdrawalBgContracts
+        );
+
+        // check that jpeg was returned to user
+        address firstWithdrawalTokenOwner;
+        if (firstWithdrawalBgContracts[0] == 0) {
+            firstWithdrawalTokenOwner = kids.ownerOf(depositTokenIds[0]);
+        } else {
+            firstWithdrawalTokenOwner = pups.ownerOf(depositTokenIds[0]);
+        }
+        assertEq(firstWithdrawalTokenOwner, USER_ADDRESS);
+
+        // check that other jpegs are still deposited
+        uint256[][2] memory depositsAfterFirstWithdrawal = stakingContract
+            .depositsOf(USER_ADDRESS);
+        assertEq(depositsAfterFirstWithdrawal[1][0], depositTokenIds[1]);
+        assertEq(depositsAfterFirstWithdrawal[1][1], depositTokenIds[2]);
+
+        // withdraw the rest
+        uint256[] memory secondWithdrawalTokenIds = new uint256[](2);
+        secondWithdrawalTokenIds[0] = depositTokenIds[1];
+        secondWithdrawalTokenIds[1] = depositTokenIds[2];
+
+        uint8[] memory secondWithdrawalBgContracts = new uint8[](2);
+        secondWithdrawalBgContracts[0] = depositBgContracts[1];
+        secondWithdrawalBgContracts[1] = depositBgContracts[2];
+
+        stakingContract.withdraw(
+            secondWithdrawalTokenIds,
+            secondWithdrawalBgContracts
+        );
+
+        // check that jpegs were returned to user
+        for (uint256 i; i < secondWithdrawalTokenIds.length; i++) {
+            address secondWithdrawalTokenOwner = getTokenOwner(
+                secondWithdrawalBgContracts[i],
+                secondWithdrawalTokenIds[i]
+            );
+            assertEq(secondWithdrawalTokenOwner, USER_ADDRESS);
+        }
+
+        cheats.stopPrank();
+    }
+
+    // don't let a user withdraw a jpeg that hasn't been deposited
+    function testFailWithdraw() public {
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = 1;
+
+        uint8[] memory bgContracts = new uint8[](1);
+        bgContracts[0] = 0;
+
+        stakingContract.withdraw(tokenIds, bgContracts);
+    }
+
+    function testLock() public {
+        // setup: deposit some jpegs
+        uint256[] memory tokenIds = new uint256[](3);
+        tokenIds[0] = 8177;
+        tokenIds[1] = 9003;
+        tokenIds[2] = 9717;
+
+        uint8[] memory bgContracts = new uint8[](3);
+        bgContracts[0] = 0;
+        bgContracts[1] = 1;
+        bgContracts[2] = 1;
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+        stakingContract.deposit(tokenIds, bgContracts);
+
+        // throw away the key
+        uint256[] memory durations = new uint256[](3);
+        durations[0] = 1;
+        durations[1] = 2;
+        durations[2] = 3;
+
+        stakingContract.lock(tokenIds, durations, bgContracts);
+
+        // check locksOf
+        uint256[][2] memory locks = stakingContract.locksOf(USER_ADDRESS);
+        assertEq(locks[0][0], tokenIds[0]);
+        assertEq(locks[1][0], tokenIds[1]);
+        assertEq(locks[1][1], tokenIds[2]);
+
+        cheats.stopPrank();
+    }
+
+    // function testFailLock() public {}
+
+    function testDepositAndLock() public {
+        uint256[] memory tokenIds = new uint256[](3);
+        tokenIds[0] = 8177;
+        tokenIds[1] = 9003;
+        tokenIds[2] = 9717;
+
+        uint8[] memory bgContracts = new uint8[](3);
+        bgContracts[0] = 0;
+        bgContracts[1] = 1;
+        bgContracts[2] = 1;
+
+        uint256[] memory durations = new uint256[](3);
+        durations[0] = 1;
+        durations[1] = 2;
+        durations[2] = 3;
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+
+        // deposit and lock some jpegs
+        stakingContract.depositAndLock(tokenIds, durations, bgContracts);
+
+        // check depositsOf
+        uint256[][2] memory deposits = stakingContract.locksOf(USER_ADDRESS);
+        assertEq(deposits[0][0], tokenIds[0]);
+        assertEq(deposits[1][0], tokenIds[1]);
+        assertEq(deposits[1][1], tokenIds[2]);
+
+        // check locksOf
+        uint256[][2] memory locks = stakingContract.locksOf(USER_ADDRESS);
+        assertEq(locks[0][0], tokenIds[0]);
+        assertEq(locks[1][0], tokenIds[1]);
+        assertEq(locks[1][1], tokenIds[2]);
+
+        cheats.stopPrank();
+    }
+
+    // function testFailDepositAndLock() public {}
+
+    // TODO: use function warp(uint x) public Sets the block timestamp to x
+    // https://github.com/foundry-rs/foundry/tree/master/forge
+    // function testCalculateRewards() public {}
+
+    // function testFailCalculateRewards() public {}
+
+    // function testClaimRewards() public {}
+
+    // function testFailClaimRewards() public {}
 }
