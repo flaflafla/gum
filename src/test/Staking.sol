@@ -386,7 +386,28 @@ contract StakingTest is DSTest {
         cheats.stopPrank();
     }
 
-    // function testFailLock() public {}
+    // don't let a user lock jpegs that aren't deposited
+    function testFailLock() public {
+        uint256[] memory tokenIds = new uint256[](3);
+        tokenIds[0] = 8177;
+        tokenIds[1] = 9003;
+        tokenIds[2] = 9717;
+
+        uint8[] memory bgContracts = new uint8[](3);
+        bgContracts[0] = 0;
+        bgContracts[1] = 1;
+        bgContracts[2] = 1;
+
+        uint256[] memory durations = new uint256[](3);
+        durations[0] = 1;
+        durations[1] = 2;
+        durations[2] = 3;
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+
+        stakingContract.lock(tokenIds, durations, bgContracts);
+        cheats.stopPrank();
+    }
 
     function testDepositAndLock() public {
         uint256[] memory tokenIds = new uint256[](3);
@@ -424,7 +445,23 @@ contract StakingTest is DSTest {
         cheats.stopPrank();
     }
 
-    // function testFailDepositAndLock() public {}
+    // don't let a user deposit and lock jpegs they don't own
+    function testFailDepositAndLock() public {
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = 666;
+
+        uint8[] memory bgContracts = new uint8[](1);
+        bgContracts[0] = 0;
+
+        uint256[] memory durations = new uint256[](1);
+        durations[0] = 1;
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+
+        stakingContract.depositAndLock(tokenIds, durations, bgContracts);
+
+        cheats.stopPrank();
+    }
 
     // TODO: use function warp(uint x) public Sets the block timestamp to x
     // https://github.com/foundry-rs/foundry/tree/master/forge
