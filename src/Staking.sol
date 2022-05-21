@@ -41,8 +41,8 @@ contract Staking is ERC721Holder, Ownable {
     // duration is the index of lockBoostRates/lockDurationsConfig
     mapping(BGContract => mapping(uint256 => uint256))
         public lockDurationsByTokenId;
-    uint256[5] public lockDurationsConfig; // in days
-    uint256[5] public lockBoostRates; // decimals == 3
+    uint256[4] public lockDurationsConfig; // in days
+    uint256[4] public lockBoostRates; // decimals == 3
 
     event GumTokenUpdated(address _gumToken);
     event Started();
@@ -118,25 +118,25 @@ contract Staking is ERC721Holder, Ownable {
         address account,
         uint256 tokenId,
         uint8 _bgContract
-    ) internal returns (uint256) {
+    ) internal returns (uint256 rate) {
         uint256 boost = 1000;
         BGContract bgContract = BGContract(_bgContract);
         if (_locks[account][bgContract].contains(tokenId)) {
-            uint256 duration = lockDurationsConfig[
-                lockDurationsByTokenId[bgContract][tokenId]
-            ];
+            uint256 duration = lockDurationsByTokenId[bgContract][tokenId];
+            uint256 durationDays = lockDurationsConfig[duration];
             uint256 lockDaysElapsed = (block.number -
                 lockBlocks[bgContract][tokenId]) / 6000;
-            if (lockDaysElapsed <= duration) {
+            if (lockDaysElapsed <= durationDays) {
                 boost = lockBoostRates[duration];
             }
         }
         uint256 depositDaysElapsed = (block.number -
             depositBlocks[bgContract][tokenId]) / 6000;
-        return
+        rate =
             ((stakeRewardRate *
                 depositDaysElapsed *
-                10**uint256(IGum(gumToken).decimals())) * boost) / 1000;
+                10**uint256(IGum(gumToken).decimals())) * boost) /
+            1000;
     }
 
     function calculateRewards(

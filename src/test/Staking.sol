@@ -9,6 +9,8 @@ import "../Staking.sol";
 interface CheatCodes {
     function prank(address) external;
 
+    function roll(uint256) external;
+
     function startPrank(address, address) external;
 
     function stopPrank() external;
@@ -354,6 +356,13 @@ contract StakingTest is DSTest {
         stakingContract.withdraw(tokenIds, bgContracts);
     }
 
+    // TODO
+    // function testWithdrawLocked() public {}
+
+    // TODO
+    // don't let a user withdraw a jpeg whose lock hasn't expired
+    // function testFailWithdrawLocked() public {}
+
     function testLock() public {
         // setup: deposit some jpegs
         uint256[] memory tokenIds = new uint256[](3);
@@ -431,7 +440,7 @@ contract StakingTest is DSTest {
         stakingContract.depositAndLock(tokenIds, durations, bgContracts);
 
         // check depositsOf
-        uint256[][2] memory deposits = stakingContract.locksOf(USER_ADDRESS);
+        uint256[][2] memory deposits = stakingContract.depositsOf(USER_ADDRESS);
         assertEq(deposits[0][0], tokenIds[0]);
         assertEq(deposits[1][0], tokenIds[1]);
         assertEq(deposits[1][1], tokenIds[2]);
@@ -463,13 +472,110 @@ contract StakingTest is DSTest {
         cheats.stopPrank();
     }
 
-    // TODO: use function warp(uint x) public Sets the block timestamp to x
-    // https://github.com/foundry-rs/foundry/tree/master/forge
-    // function testCalculateRewards() public {}
+    function testCalculateRewards() public {
+        uint256[] memory tokenIds = new uint256[](3);
+        tokenIds[0] = 4245;
+        tokenIds[1] = 4224;
+        tokenIds[2] = 9898;
 
+        uint8[] memory bgContracts = new uint8[](3);
+        bgContracts[0] = 0;
+        bgContracts[1] = 0;
+        bgContracts[2] = 1;
+
+        cheats.prank(USER_ADDRESS);
+        stakingContract.deposit(tokenIds, bgContracts);
+
+        // roll forward 12,000 block (~two days)
+        cheats.roll(block.number + 12_000);
+
+        uint256[] memory rewards = stakingContract.calculateRewards(
+            USER_ADDRESS,
+            tokenIds,
+            bgContracts
+        );
+
+        assertEq(rewards[0], 2 * 10**18);
+        assertEq(rewards[1], 2 * 10**18);
+        assertEq(rewards[2], 2 * 10**18);
+
+        // roll forward 3000 blocks (~half a day)
+        // rewards will be unchanged
+        cheats.roll(block.number + 3000);
+
+        rewards = stakingContract.calculateRewards(
+            USER_ADDRESS,
+            tokenIds,
+            bgContracts
+        );
+
+        assertEq(rewards[0], 2 * 10**18);
+        assertEq(rewards[1], 2 * 10**18);
+        assertEq(rewards[2], 2 * 10**18);
+
+        // roll forward another half day
+        cheats.roll(block.number + 3000);
+
+        rewards = stakingContract.calculateRewards(
+            USER_ADDRESS,
+            tokenIds,
+            bgContracts
+        );
+
+        assertEq(rewards[0], 3 * 10**18);
+        assertEq(rewards[1], 3 * 10**18);
+        assertEq(rewards[2], 3 * 10**18);
+    }
+
+    // TODO
     // function testFailCalculateRewards() public {}
 
+    function testCalculateRewardsLocked() public {
+        // deposit and lock some jpegs
+        uint256[] memory tokenIds = new uint256[](3);
+        tokenIds[0] = 8177;
+        tokenIds[1] = 9003;
+        tokenIds[2] = 9717;
+
+        uint8[] memory bgContracts = new uint8[](3);
+        bgContracts[0] = 0;
+        bgContracts[1] = 1;
+        bgContracts[2] = 1;
+
+        uint256[] memory durations = new uint256[](3);
+        durations[0] = 1;
+        durations[1] = 2;
+        durations[2] = 3;
+
+        cheats.prank(USER_ADDRESS);
+        stakingContract.depositAndLock(tokenIds, durations, bgContracts);
+
+        // roll forward "two weeks"
+        cheats.roll(block.number + 6000 * 7 * 2);
+
+        uint256[] memory rewards = stakingContract.calculateRewards(
+            USER_ADDRESS,
+            tokenIds,
+            bgContracts
+        );
+
+        assertEq(
+            rewards[0],
+            (14 * 10**18 * stakingContract.lockBoostRates(1)) / 1000
+        );
+        assertEq(
+            rewards[1],
+            (14 * 10**18 * stakingContract.lockBoostRates(2)) / 1000
+        );
+        assertEq(
+            rewards[2],
+            (14 * 10**18 * stakingContract.lockBoostRates(3)) / 1000
+        );
+    }
+
+    // TODO
     // function testClaimRewards() public {}
 
+    // TODO
     // function testFailClaimRewards() public {}
 }
