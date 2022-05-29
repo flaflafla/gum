@@ -63,16 +63,17 @@ contract StakingTest is DSTest {
     address USER_ADDRESS = address(1);
     address TRANSFER_ADDRESS = address(2);
     address MARKETPLACE_ADDRESS = address(3);
-    address STAKING_ADDRESS = address(4);
-    address RANDO_ADDRESS = address(5);
+    address RANDO_ADDRESS = address(4);
+    address TEMP_STAKING_ADDRESS = address(5);
 
     address BGK_ADDR = address(0xa5ae87B40076745895BB7387011ca8DE5fde37E0);
     address BGP_ADDR = address(0x86e9C5ad3D4b5519DA2D2C19F5c71bAa5Ef40933);
     address WHALE = address(0x521bC9Bb5Ab741658e48eF578D291aEe05DbA358);
 
     function setUp() public {
-        gumContract = new Gum(MARKETPLACE_ADDRESS, STAKING_ADDRESS);
+        gumContract = new Gum(MARKETPLACE_ADDRESS, TEMP_STAKING_ADDRESS);
         stakingContract = new Staking(address(gumContract));
+        gumContract.updateStaking(address(stakingContract));
 
         uint256[] memory kidsIds = new uint256[](12);
         kidsIds[0] = 4245;
@@ -345,6 +346,33 @@ contract StakingTest is DSTest {
         cheats.stopPrank();
     }
 
+    function testWithdrawWithRewards() public {
+        // setup: deposit some jpegs
+        uint256[] memory tokenIds = new uint256[](3);
+        tokenIds[0] = 8177;
+        tokenIds[1] = 9003;
+        tokenIds[2] = 9717;
+
+        uint8[] memory bgContracts = new uint8[](3);
+        bgContracts[0] = 0;
+        bgContracts[1] = 1;
+        bgContracts[2] = 1;
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+        stakingContract.deposit(tokenIds, bgContracts);
+
+        uint256 daysElapsed = 100;
+        cheats.roll(block.number + 6000 * daysElapsed);
+
+        stakingContract.withdraw(tokenIds, bgContracts);
+
+        cheats.stopPrank();
+
+        uint256 gumBalance = gumContract.balanceOf(USER_ADDRESS) /
+            (10**uint256(gumContract.decimals()));
+        assertEq(gumBalance, daysElapsed * tokenIds.length);
+    }
+
     // don't let a user withdraw a jpeg that hasn't been deposited
     function testFailWithdraw() public {
         uint256[] memory tokenIds = new uint256[](1);
@@ -356,12 +384,71 @@ contract StakingTest is DSTest {
         stakingContract.withdraw(tokenIds, bgContracts);
     }
 
-    // TODO
-    // function testWithdrawLocked() public {}
+    function testWithdrawLocked() public {
+        uint256[] memory tokenIds = new uint256[](3);
+        tokenIds[0] = 8177;
+        tokenIds[1] = 9003;
+        tokenIds[2] = 9717;
 
-    // TODO
+        uint8[] memory bgContracts = new uint8[](3);
+        bgContracts[0] = 0;
+        bgContracts[1] = 1;
+        bgContracts[2] = 1;
+
+        uint256[] memory durations = new uint256[](3);
+        durations[0] = 1;
+        durations[1] = 2;
+        durations[2] = 3;
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+
+        // deposit and lock some jpegs
+        stakingContract.depositAndLock(tokenIds, durations, bgContracts);
+
+        uint256 duration = stakingContract.lockDurationsConfig(3);
+        cheats.roll(block.number + 6000 * duration);
+
+        stakingContract.withdraw(tokenIds, bgContracts);
+
+        /*
+               30 * 1.1
+                    150
+              90 * 1.25
+                     90
+            + 180 * 1.4
+            -----------
+                   ~637
+        */
+        uint256 gumBalance = gumContract.balanceOf(USER_ADDRESS) /
+            (10**uint256(gumContract.decimals()));
+        assertEq(gumBalance, 637);
+
+        cheats.stopPrank();
+    }
+
     // don't let a user withdraw a jpeg whose lock hasn't expired
-    // function testFailWithdrawLocked() public {}
+    function testFailWithdrawLocked() public {
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = 8177;
+
+        uint8[] memory bgContracts = new uint8[](1);
+        bgContracts[0] = 0;
+
+        uint256[] memory durations = new uint256[](1);
+        durations[0] = 3;
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+
+        // deposit and lock a jpeg
+        stakingContract.depositAndLock(tokenIds, durations, bgContracts);
+
+        // roll forward, but not enough
+        uint256 duration = stakingContract.lockDurationsConfig(2);
+        cheats.roll(block.number + 6000 * duration);
+
+        // try to withdraw the jpeg
+        stakingContract.withdraw(tokenIds, bgContracts);
+    }
 
     function testLock() public {
         // setup: deposit some jpegs
@@ -527,8 +614,16 @@ contract StakingTest is DSTest {
         assertEq(rewards[2], 3 * 10**18);
     }
 
-    // TODO
-    // function testFailCalculateRewards() public {}
+    function testFailCalculateRewards() public {
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = 8177;
+
+        uint8[] memory bgContracts = new uint8[](2);
+        bgContracts[0] = 0;
+        bgContracts[1] = 1;
+
+        stakingContract.calculateRewards(USER_ADDRESS, tokenIds, bgContracts);
+    }
 
     function testCalculateRewardsLocked() public {
         // deposit and lock some jpegs
@@ -559,18 +654,7 @@ contract StakingTest is DSTest {
             bgContracts
         );
 
-        assertEq(
-            rewards[0],
-            (14 * 10**18 * stakingContract.lockBoostRates(1)) / 1000
-        );
-        assertEq(
-            rewards[1],
-            (14 * 10**18 * stakingContract.lockBoostRates(2)) / 1000
-        );
-        assertEq(
-            rewards[2],
-            (14 * 10**18 * stakingContract.lockBoostRates(3)) / 1000
-        );
+        // TODO: calculate expected values
     }
 
     // TODO

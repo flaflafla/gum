@@ -14,7 +14,13 @@ interface IGum {
     function decimals() external returns (uint8);
 }
 
-// note: this contract assumes 6000 ethereum blocks per day
+/**
+ * @notice Accept deposits of BubblegumKid and BubblegumPuppy NFTs
+ * ("staking") in exchange for GUM token rewards. Staked NFTs can
+ * also be "locked," preventing their withdrawal for a period of time
+ * in exchange for accelerated rewards.
+ * @dev Contract assumes 6000 ethereum blocks per day.
+ */
 contract Staking is ERC721Holder, Ownable {
     using EnumerableSet for EnumerableSet.UintSet;
 
@@ -37,11 +43,9 @@ contract Staking is ERC721Holder, Ownable {
     mapping(address => mapping(BGContract => EnumerableSet.UintSet))
         private _locks;
     mapping(BGContract => mapping(uint256 => uint256)) public lockBlocks;
-
-    // duration is the index of lockBoostRates/lockDurationsConfig
     mapping(BGContract => mapping(uint256 => uint256))
         public lockDurationsByTokenId;
-    uint256[4] public lockDurationsConfig; // in days
+    uint256[4] public lockDurationsConfig; // in "days" (multiples of 6000 blocks)
     uint256[4] public lockBoostRates; // decimals == 3
 
     event GumTokenUpdated(address _gumToken);
@@ -68,10 +72,15 @@ contract Staking is ERC721Holder, Ownable {
 
     constructor(address _gumToken) {
         gumToken = _gumToken;
-        lockBoostRates = [1000, 1100, 1250, 1400];
+        lockBoostRates = [0, 100, 250, 400];
         lockDurationsConfig = [0, 30, 90, 180];
         stakeRewardRate = 1;
         started = false;
+    }
+
+    modifier onlyStarted() {
+        require(started, "not started");
+        _;
     }
 
     function start() public onlyOwner {
@@ -84,6 +93,10 @@ contract Staking is ERC721Holder, Ownable {
         emit Stopped();
     }
 
+    /**
+     * @dev Change the address of the reward token contract (must
+     * support ERC20 functions named in IGum interface).
+     */
     function updateGumToken(address _gumToken) public onlyOwner {
         gumToken = _gumToken;
         emit GumTokenUpdated(_gumToken);
@@ -114,48 +127,54 @@ contract Staking is ERC721Holder, Ownable {
         IGum(gumToken).mint(to, amount);
     }
 
-    function getRate(
+    function getRewardsForToken(
         address account,
         uint256 tokenId,
         uint8 _bgContract
-    ) internal returns (uint256 rate) {
-        uint256 boost = 1000;
+    ) internal returns (uint256) {
         BGContract bgContract = BGContract(_bgContract);
+        if (!_deposits[account][bgContract].contains(tokenId)) {
+            return 0;
+        }
+        uint256 boostedRewards = 0;
+        uint256 gumDecimals = uint256(IGum(gumToken).decimals());
         if (_locks[account][bgContract].contains(tokenId)) {
             uint256 duration = lockDurationsByTokenId[bgContract][tokenId];
             uint256 durationDays = lockDurationsConfig[duration];
             uint256 lockDaysElapsed = (block.number -
                 lockBlocks[bgContract][tokenId]) / 6000;
-            if (lockDaysElapsed <= durationDays) {
-                boost = lockBoostRates[duration];
+            uint256 boost = lockBoostRates[duration];
+            if (lockDaysElapsed < durationDays) {
+                boostedRewards = lockDaysElapsed * boost;
+            } else {
+                boostedRewards = durationDays * boost;
             }
+            boostedRewards = boostedRewards * 10**gumDecimals / 1000;
         }
         uint256 depositDaysElapsed = (block.number -
             depositBlocks[bgContract][tokenId]) / 6000;
-        rate =
-            ((stakeRewardRate *
-                depositDaysElapsed *
-                10**uint256(IGum(gumToken).decimals())) * boost) /
-            1000;
+        uint256 regularRewards = (stakeRewardRate *
+            depositDaysElapsed *
+            10**gumDecimals);
+        return regularRewards + boostedRewards;
     }
 
     function calculateRewards(
         address account,
-        uint256[] memory tokenIds,
+        uint256[] calldata tokenIds,
         uint8[] calldata bgContracts
     ) public returns (uint256[] memory rewards) {
+        require(
+            tokenIds.length == bgContracts.length,
+            "argument lengths don't match"
+        );
         rewards = new uint256[](tokenIds.length);
         for (uint256 i; i < tokenIds.length; i++) {
-            uint256 rate = getRate(account, tokenIds[i], bgContracts[i]);
-            rewards[i] =
-                rate *
-                (
-                    _deposits[account][BGContract(bgContracts[i])].contains(
-                        tokenIds[i]
-                    )
-                        ? 1
-                        : 0
-                );
+            rewards[i] = getRewardsForToken(
+                account,
+                tokenIds[i],
+                bgContracts[i]
+            );
         }
     }
 
@@ -163,10 +182,6 @@ contract Staking is ERC721Holder, Ownable {
         uint256[] calldata tokenIds,
         uint8[] calldata bgContracts
     ) public {
-        require(
-            tokenIds.length == bgContracts.length,
-            "argument lengths don't match"
-        );
         uint256 amount;
         address to = msg.sender;
         uint256[] memory rewards = calculateRewards(to, tokenIds, bgContracts);
@@ -183,8 +198,8 @@ contract Staking is ERC721Holder, Ownable {
 
     function deposit(uint256[] calldata tokenIds, uint8[] calldata bgContracts)
         external
+        onlyStarted
     {
-        require(started, "not started");
         require(
             tokenIds.length == bgContracts.length,
             "argument lengths don't match"
@@ -235,7 +250,7 @@ contract Staking is ERC721Holder, Ownable {
                 ];
                 uint256 daysElapsed = (block.number -
                     lockBlocks[bgContract][tokenId]) / 6000;
-                require(daysElapsed > duration, "token still locked");
+                require(daysElapsed >= duration, "token still locked");
                 _locks[account][bgContract].remove(tokenId);
             }
             _deposits[account][bgContract].remove(tokenId);
@@ -283,12 +298,11 @@ contract Staking is ERC721Holder, Ownable {
         uint256[] calldata tokenIds,
         uint256[] calldata durations,
         uint8[] calldata bgContracts
-    ) external {
-        require(started, "not started");
+    ) external onlyStarted {
         require(
             tokenIds.length == durations.length &&
                 tokenIds.length == bgContracts.length,
-            "token ids don't match durations"
+            "argument lengths don't match"
         );
         claimRewards(tokenIds, bgContracts);
         address account = msg.sender;
@@ -332,8 +346,7 @@ contract Staking is ERC721Holder, Ownable {
         uint256[] calldata tokenIds,
         uint256[] calldata durations,
         uint8[] calldata bgContracts
-    ) external {
-        require(started, "not started");
+    ) external onlyStarted {
         require(
             tokenIds.length == durations.length &&
                 tokenIds.length == bgContracts.length,
