@@ -369,7 +369,7 @@ contract StakingTest is DSTest {
         cheats.stopPrank();
 
         uint256 gumBalance = gumContract.balanceOf(USER_ADDRESS) /
-            (10**uint256(gumContract.decimals()));
+            10**18;
         assertEq(gumBalance, daysElapsed * tokenIds.length);
     }
 
@@ -419,9 +419,8 @@ contract StakingTest is DSTest {
             -----------
                    ~637
         */
-        uint256 gumBalance = gumContract.balanceOf(USER_ADDRESS) /
-            (10**uint256(gumContract.decimals()));
-        assertEq(gumBalance, 637);
+        uint256 gumBalance = gumContract.balanceOf(USER_ADDRESS);
+        assertEq(gumBalance, 6375 * (10**17));
 
         cheats.stopPrank();
     }
@@ -646,7 +645,7 @@ contract StakingTest is DSTest {
         stakingContract.depositAndLock(tokenIds, durations, bgContracts);
 
         // roll forward "two weeks"
-        cheats.roll(block.number + 6000 * 7 * 2);
+        cheats.roll(block.number + 6000 * 14);
 
         uint256[] memory rewards = stakingContract.calculateRewards(
             USER_ADDRESS,
@@ -654,12 +653,41 @@ contract StakingTest is DSTest {
             bgContracts
         );
 
-        // TODO: calculate expected values
+        assertEq(rewards[0], 154 * 10**17);
+        assertEq(rewards[1], 175 * 10**17);
+        assertEq(rewards[2], 196 * 10**17);
     }
 
-    // TODO
-    // function testClaimRewards() public {}
+    function testClaimRewards() public {
+        // deposit and lock some jpegs
+        uint256[] memory tokenIds = new uint256[](3);
+        tokenIds[0] = 8177;
+        tokenIds[1] = 9003;
+        tokenIds[2] = 9717;
 
-    // TODO
-    // function testFailClaimRewards() public {}
+        uint8[] memory bgContracts = new uint8[](3);
+        bgContracts[0] = 0;
+        bgContracts[1] = 1;
+        bgContracts[2] = 1;
+
+        uint256[] memory durations = new uint256[](3);
+        durations[0] = 1;
+        durations[1] = 2;
+        durations[2] = 3;
+
+        cheats.prank(USER_ADDRESS);
+        stakingContract.depositAndLock(tokenIds, durations, bgContracts);
+
+        // roll forward "two weeks"
+        cheats.roll(block.number + 6000 * 14);
+
+        cheats.prank(USER_ADDRESS);
+        stakingContract.claimRewards(
+            tokenIds,
+            bgContracts
+        );
+
+        uint256 gumBalance = gumContract.balanceOf(USER_ADDRESS);
+        assertEq(gumBalance, (154 + 175 + 196) * (10**17));
+    }
 }
