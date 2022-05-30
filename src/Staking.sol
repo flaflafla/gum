@@ -18,8 +18,10 @@ interface IGum {
  * @notice Accept deposits of BubblegumKid and BubblegumPuppy NFTs
  * ("staking") in exchange for GUM token rewards. Staked NFTs can
  * also be "locked," preventing their withdrawal for a period of time
- * in exchange for accelerated rewards.
- * @dev Contract assumes 6000 ethereum blocks per day.
+ * in exchange for accelerated rewards. Thanks to the Sappy Seals team:
+ * this contract is largely based on their staking contract at
+ * 0xdf8A88212FF229446e003f8f879e263D3616b57A.
+ * @dev Contract defines a "day" as 6000 ethereum blocks.
  */
 contract Staking is ERC721Holder, Ownable {
     using EnumerableSet for EnumerableSet.UintSet;
@@ -45,8 +47,10 @@ contract Staking is ERC721Holder, Ownable {
     mapping(BGContract => mapping(uint256 => uint256)) public lockBlocks;
     mapping(BGContract => mapping(uint256 => uint256))
         public lockDurationsByTokenId;
-    uint256[4] public lockDurationsConfig; // in "days" (multiples of 6000 blocks)
-    uint256[4] public lockBoostRates; // decimals == 3
+    // in "days" (multiples of 6000 blocks)
+    uint256[4] public lockDurationsConfig;
+    // decimals == 3
+    uint256[4] public lockBoostRates;
 
     event GumTokenUpdated(address _gumToken);
     event Started();
@@ -127,35 +131,89 @@ contract Staking is ERC721Holder, Ownable {
         IGum(gumToken).mint(to, amount);
     }
 
+    /**
+     * @dev Calculate accrued GUM token rewards for a given
+     * BGK or BGP NFT
+     * @param account The user's ethereum address
+     * @param tokenId The NFT's id
+     * @param _bgContract Kids (0) or Puppies (1)
+     * @return Rewards
+     */
     function getRewardsForToken(
         address account,
         uint256 tokenId,
         uint8 _bgContract
     ) internal returns (uint256) {
         BGContract bgContract = BGContract(_bgContract);
+        // the user has not staked this nft
         if (!_deposits[account][bgContract].contains(tokenId)) {
             return 0;
         }
+        // when was the NFT deposited?
+        uint256 depositBlock = depositBlocks[bgContract][tokenId];
+        // separately calculate `boostedRewards` (for locked NFTs) and
+        // `regularRewards` (for NFTs that have been staked but not
+        // locked -- see below). add them together to find total rewards
         uint256 boostedRewards = 0;
-        uint256 gumDecimals = uint256(IGum(gumToken).decimals());
+        // is (or was) the NFT locked?
         if (_locks[account][bgContract].contains(tokenId)) {
-            uint256 duration = lockDurationsByTokenId[bgContract][tokenId];
-            uint256 durationDays = lockDurationsConfig[duration];
-            uint256 lockDaysElapsed = (block.number -
-                lockBlocks[bgContract][tokenId]) / 6000;
-            uint256 boost = lockBoostRates[duration];
-            if (lockDaysElapsed < durationDays) {
+            // when was the NFT locked?
+            uint256 lockBlock = lockBlocks[bgContract][tokenId];
+            // `durationIndex` is used to access values on `lockDurationsConfig`
+            // and `lockBoostRates`
+            uint256 durationIndex = lockDurationsByTokenId[bgContract][tokenId];
+            // how many days was the NFT locked for?
+            uint256 durationDays = lockDurationsConfig[durationIndex];
+            // `startingBlock` is the block when token rewards began accruing.
+            // this could be the block at which the token was locked,
+            // or it could be the block at which the user last claimed
+            // rewards (which is tracked by updates to `depositBlocks`
+            // -- see `claimRewards`)
+            uint256 startingBlock = lockBlock;
+            if (startingBlock < depositBlock) {
+                startingBlock = depositBlock;
+            }
+            // `endingBlock` is when rewards stop accruing. this is either the
+            // block at which the lock expired, if it has expired, or the
+            // current block, if it hasn't
+            uint256 endingBlock = lockBlock + durationDays * 6000;
+            if (endingBlock > block.number) {
+                endingBlock = block.number;
+            } else {
+                // if the lock has expired, remove the NFT from `lockBlocks`
+                // to save gas on next claim
+                _locks[account][bgContract].remove(tokenId);
+            }
+            // how many days have passed from initial lock or last claim
+            // to the ending block?
+            uint256 lockDaysElapsed = (endingBlock - startingBlock) / 6000;
+            uint256 boost = lockBoostRates[durationIndex];
+            // if the user has claimed since locking, account for that
+            // by calculating `remainingDurationDays`
+            uint256 remainingDurationDays = durationDays -
+                (depositBlock - lockBlock) *
+                6000;
+            // if the remaining lock time hasn't elapsed, reward based on
+            // elapsed days, otherwise reward based on `remainingDurationDays`.
+            // in other worrds, cap rewards at the remaining lock time,
+            // even if more time has elapsed since lock or last claim
+            if (lockDaysElapsed < remainingDurationDays) {
                 boostedRewards = lockDaysElapsed * boost;
             } else {
-                boostedRewards = durationDays * boost;
+                boostedRewards = remainingDurationDays * boost;
             }
-            boostedRewards = boostedRewards * 10**gumDecimals / 1000;
+            // calculate boosted rewards
+            boostedRewards =
+                (boostedRewards * 10**uint256(IGum(gumToken).decimals())) /
+                1000;
         }
-        uint256 depositDaysElapsed = (block.number -
-            depositBlocks[bgContract][tokenId]) / 6000;
-        uint256 regularRewards = (stakeRewardRate *
+        // how many days have elapsed since the NFT was deposited or
+        // rewards were claimed?
+        uint256 depositDaysElapsed = (block.number - depositBlock) / 6000;
+        // calculate regular deposit rewards
+        uint256 regularRewards = stakeRewardRate *
             depositDaysElapsed *
-            10**gumDecimals);
+            10**uint256(IGum(gumToken).decimals());
         return regularRewards + boostedRewards;
     }
 
@@ -251,6 +309,8 @@ contract Staking is ERC721Holder, Ownable {
                 uint256 daysElapsed = (block.number -
                     lockBlocks[bgContract][tokenId]) / 6000;
                 require(daysElapsed >= duration, "token still locked");
+                // this line can likely be removed, since `claimRewards`
+                // removes expired locks
                 _locks[account][bgContract].remove(tokenId);
             }
             _deposits[account][bgContract].remove(tokenId);

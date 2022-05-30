@@ -60,11 +60,15 @@ contract StakingTest is DSTest {
     IBGK kids;
     IBGP pups;
 
+    uint256[] internal kidsIds = new uint256[](12);
+    uint256[] internal pupsIds = new uint256[](12);
+
     address USER_ADDRESS = address(1);
     address TRANSFER_ADDRESS = address(2);
     address MARKETPLACE_ADDRESS = address(3);
     address RANDO_ADDRESS = address(4);
     address TEMP_STAKING_ADDRESS = address(5);
+    address USER_ADDRESS_TWO = address(6);
 
     address BGK_ADDR = address(0xa5ae87B40076745895BB7387011ca8DE5fde37E0);
     address BGP_ADDR = address(0x86e9C5ad3D4b5519DA2D2C19F5c71bAa5Ef40933);
@@ -75,7 +79,6 @@ contract StakingTest is DSTest {
         stakingContract = new Staking(address(gumContract));
         gumContract.updateStaking(address(stakingContract));
 
-        uint256[] memory kidsIds = new uint256[](12);
         kidsIds[0] = 4245;
         kidsIds[1] = 4224;
         kidsIds[2] = 579;
@@ -99,7 +102,6 @@ contract StakingTest is DSTest {
             kids.safeTransferFrom(WHALE, USER_ADDRESS, kidsIds[i]);
         }
 
-        uint256[] memory pupsIds = new uint256[](12);
         pupsIds[0] = 9898;
         pupsIds[1] = 9003;
         pupsIds[2] = 9717;
@@ -124,6 +126,11 @@ contract StakingTest is DSTest {
         cheats.stopPrank();
 
         cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+        kids.setApprovalForAll(address(stakingContract), true);
+        pups.setApprovalForAll(address(stakingContract), true);
+        cheats.stopPrank();
+
+        cheats.startPrank(USER_ADDRESS_TWO, USER_ADDRESS_TWO);
         kids.setApprovalForAll(address(stakingContract), true);
         pups.setApprovalForAll(address(stakingContract), true);
         cheats.stopPrank();
@@ -236,9 +243,9 @@ contract StakingTest is DSTest {
 
     function testDeposit() public {
         uint256[] memory tokenIds = new uint256[](3);
-        tokenIds[0] = 4245;
-        tokenIds[1] = 4224;
-        tokenIds[2] = 9898;
+        tokenIds[0] = kidsIds[0];
+        tokenIds[1] = kidsIds[1];
+        tokenIds[2] = pupsIds[0];
 
         uint8[] memory bgContracts = new uint8[](3);
         bgContracts[0] = 0;
@@ -254,9 +261,9 @@ contract StakingTest is DSTest {
         stakingContract.deposit(tokenIds, bgContracts);
 
         uint256[][2] memory deposits = stakingContract.depositsOf(USER_ADDRESS);
-        assertEq(deposits[0][0], 4245);
-        assertEq(deposits[0][1], 4224);
-        assertEq(deposits[1][0], 9898);
+        assertEq(deposits[0][0], kidsIds[0]);
+        assertEq(deposits[0][1], kidsIds[1]);
+        assertEq(deposits[1][0], pupsIds[0]);
 
         for (uint256 i; i < tokenIds.length; i++) {
             address tokenOwner = getTokenOwner(bgContracts[i], tokenIds[i]);
@@ -281,9 +288,9 @@ contract StakingTest is DSTest {
     function testWithdraw() public {
         // setup: deposit some jpegs
         uint256[] memory depositTokenIds = new uint256[](3);
-        depositTokenIds[0] = 8177;
-        depositTokenIds[1] = 9003;
-        depositTokenIds[2] = 9717;
+        depositTokenIds[0] = kidsIds[2];
+        depositTokenIds[1] = pupsIds[1];
+        depositTokenIds[2] = pupsIds[2];
 
         uint8[] memory depositBgContracts = new uint8[](3);
         depositBgContracts[0] = 0;
@@ -349,9 +356,9 @@ contract StakingTest is DSTest {
     function testWithdrawWithRewards() public {
         // setup: deposit some jpegs
         uint256[] memory tokenIds = new uint256[](3);
-        tokenIds[0] = 8177;
-        tokenIds[1] = 9003;
-        tokenIds[2] = 9717;
+        tokenIds[0] = kidsIds[2];
+        tokenIds[1] = pupsIds[1];
+        tokenIds[2] = pupsIds[2];
 
         uint8[] memory bgContracts = new uint8[](3);
         bgContracts[0] = 0;
@@ -368,8 +375,7 @@ contract StakingTest is DSTest {
 
         cheats.stopPrank();
 
-        uint256 gumBalance = gumContract.balanceOf(USER_ADDRESS) /
-            10**18;
+        uint256 gumBalance = gumContract.balanceOf(USER_ADDRESS) / 10**18;
         assertEq(gumBalance, daysElapsed * tokenIds.length);
     }
 
@@ -386,9 +392,9 @@ contract StakingTest is DSTest {
 
     function testWithdrawLocked() public {
         uint256[] memory tokenIds = new uint256[](3);
-        tokenIds[0] = 8177;
-        tokenIds[1] = 9003;
-        tokenIds[2] = 9717;
+        tokenIds[0] = kidsIds[2];
+        tokenIds[1] = pupsIds[1];
+        tokenIds[2] = pupsIds[2];
 
         uint8[] memory bgContracts = new uint8[](3);
         bgContracts[0] = 0;
@@ -428,7 +434,7 @@ contract StakingTest is DSTest {
     // don't let a user withdraw a jpeg whose lock hasn't expired
     function testFailWithdrawLocked() public {
         uint256[] memory tokenIds = new uint256[](1);
-        tokenIds[0] = 8177;
+        tokenIds[0] = kidsIds[2];
 
         uint8[] memory bgContracts = new uint8[](1);
         bgContracts[0] = 0;
@@ -452,9 +458,9 @@ contract StakingTest is DSTest {
     function testLock() public {
         // setup: deposit some jpegs
         uint256[] memory tokenIds = new uint256[](3);
-        tokenIds[0] = 8177;
-        tokenIds[1] = 9003;
-        tokenIds[2] = 9717;
+        tokenIds[0] = kidsIds[2];
+        tokenIds[1] = pupsIds[1];
+        tokenIds[2] = pupsIds[2];
 
         uint8[] memory bgContracts = new uint8[](3);
         bgContracts[0] = 0;
@@ -484,9 +490,9 @@ contract StakingTest is DSTest {
     // don't let a user lock jpegs that aren't deposited
     function testFailLock() public {
         uint256[] memory tokenIds = new uint256[](3);
-        tokenIds[0] = 8177;
-        tokenIds[1] = 9003;
-        tokenIds[2] = 9717;
+        tokenIds[0] = kidsIds[2];
+        tokenIds[1] = pupsIds[1];
+        tokenIds[2] = pupsIds[2];
 
         uint8[] memory bgContracts = new uint8[](3);
         bgContracts[0] = 0;
@@ -506,9 +512,9 @@ contract StakingTest is DSTest {
 
     function testDepositAndLock() public {
         uint256[] memory tokenIds = new uint256[](3);
-        tokenIds[0] = 8177;
-        tokenIds[1] = 9003;
-        tokenIds[2] = 9717;
+        tokenIds[0] = kidsIds[2];
+        tokenIds[1] = pupsIds[1];
+        tokenIds[2] = pupsIds[2];
 
         uint8[] memory bgContracts = new uint8[](3);
         bgContracts[0] = 0;
@@ -560,9 +566,9 @@ contract StakingTest is DSTest {
 
     function testCalculateRewards() public {
         uint256[] memory tokenIds = new uint256[](3);
-        tokenIds[0] = 4245;
-        tokenIds[1] = 4224;
-        tokenIds[2] = 9898;
+        tokenIds[0] = kidsIds[0];
+        tokenIds[1] = kidsIds[1];
+        tokenIds[2] = pupsIds[0];
 
         uint8[] memory bgContracts = new uint8[](3);
         bgContracts[0] = 0;
@@ -615,7 +621,7 @@ contract StakingTest is DSTest {
 
     function testFailCalculateRewards() public {
         uint256[] memory tokenIds = new uint256[](1);
-        tokenIds[0] = 8177;
+        tokenIds[0] = kidsIds[2];
 
         uint8[] memory bgContracts = new uint8[](2);
         bgContracts[0] = 0;
@@ -627,9 +633,9 @@ contract StakingTest is DSTest {
     function testCalculateRewardsLocked() public {
         // deposit and lock some jpegs
         uint256[] memory tokenIds = new uint256[](3);
-        tokenIds[0] = 8177;
-        tokenIds[1] = 9003;
-        tokenIds[2] = 9717;
+        tokenIds[0] = kidsIds[2];
+        tokenIds[1] = pupsIds[1];
+        tokenIds[2] = pupsIds[2];
 
         uint8[] memory bgContracts = new uint8[](3);
         bgContracts[0] = 0;
@@ -661,9 +667,9 @@ contract StakingTest is DSTest {
     function testClaimRewards() public {
         // deposit and lock some jpegs
         uint256[] memory tokenIds = new uint256[](3);
-        tokenIds[0] = 8177;
-        tokenIds[1] = 9003;
-        tokenIds[2] = 9717;
+        tokenIds[0] = kidsIds[2];
+        tokenIds[1] = pupsIds[1];
+        tokenIds[2] = pupsIds[2];
 
         uint8[] memory bgContracts = new uint8[](3);
         bgContracts[0] = 0;
@@ -682,12 +688,129 @@ contract StakingTest is DSTest {
         cheats.roll(block.number + 6000 * 14);
 
         cheats.prank(USER_ADDRESS);
-        stakingContract.claimRewards(
-            tokenIds,
-            bgContracts
-        );
+        stakingContract.claimRewards(tokenIds, bgContracts);
 
         uint256 gumBalance = gumContract.balanceOf(USER_ADDRESS);
         assertEq(gumBalance, (154 + 175 + 196) * (10**17));
     }
+
+    // make sure that after claiming rewards, deposit block
+    // for jpeg is updated -- or unchanged, if rewards aren't
+    // claimed
+    function testReadDepositBlocks() public {
+        // deposit some jpegs
+        uint256[] memory tokenIds = new uint256[](2);
+        tokenIds[0] = kidsIds[2];
+        tokenIds[1] = kidsIds[5];
+
+        uint8[] memory bgContracts = new uint8[](2);
+        bgContracts[0] = 0;
+        bgContracts[1] = 0;
+
+        cheats.prank(USER_ADDRESS);
+        stakingContract.deposit(tokenIds, bgContracts);
+
+        uint256 oldBlockNumber = block.number;
+        uint256 newBlockNumber = oldBlockNumber + 6000 * 14;
+
+        uint256 depositBlock = stakingContract.depositBlocks(
+            Staking.BGContract(bgContracts[0]),
+            tokenIds[0]
+        );
+        assertEq(depositBlock, oldBlockNumber);
+
+        cheats.roll(newBlockNumber);
+
+        // claim rewards for one jpeg
+        uint256[] memory claimTokenIds = new uint256[](1);
+        claimTokenIds[0] = tokenIds[0];
+
+        uint8[] memory claimBgContracts = new uint8[](1);
+        claimBgContracts[0] = bgContracts[0];
+
+        cheats.prank(USER_ADDRESS);
+        stakingContract.claimRewards(claimTokenIds, claimBgContracts);
+
+        // deposit block should be updated for jpeg for
+        // which rewards were claimed
+        uint256 claimedDepositBlock = stakingContract.depositBlocks(
+            Staking.BGContract(claimBgContracts[0]),
+            claimTokenIds[0]
+        );
+        assertEq(claimedDepositBlock, newBlockNumber);
+
+        // deposit block should be unchanged for other jpeg
+        uint256 unclaimedDepositBlock = stakingContract.depositBlocks(
+            Staking.BGContract(bgContracts[1]),
+            tokenIds[1]
+        );
+        assertEq(unclaimedDepositBlock, oldBlockNumber);
+    }
+
+    // make sure that after a jpeg is relocked, lock block
+    // is updated
+    function testReadLockBlocks() public {
+        // deposit and lock a jpeg
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = kidsIds[8];
+
+        uint8[] memory bgContracts = new uint8[](1);
+        bgContracts[0] = 0;
+
+        uint256[] memory durations = new uint256[](1);
+        durations[0] = 1;
+
+        cheats.prank(USER_ADDRESS);
+        stakingContract.depositAndLock(tokenIds, durations, bgContracts);
+
+        uint256 oldBlockNumber = block.number;
+        uint256 newBlockNumber = oldBlockNumber + 6000 * 31;
+
+        uint256 lockBlockOne = stakingContract.lockBlocks(
+            Staking.BGContract(bgContracts[0]),
+            tokenIds[0]
+        );
+
+        // TODO: check `locks` too
+
+        assertEq(lockBlockOne, oldBlockNumber);
+
+        // roll forward till after lock's expired
+        cheats.roll(newBlockNumber);
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+        stakingContract.withdraw(tokenIds, bgContracts);
+
+        kids.setApprovalForAll(TRANSFER_ADDRESS, true);
+        cheats.stopPrank();
+
+        cheats.prank(TRANSFER_ADDRESS);
+        kids.safeTransferFrom(USER_ADDRESS, USER_ADDRESS_TWO, tokenIds[0]);
+
+        cheats.prank(USER_ADDRESS_TWO);
+        stakingContract.depositAndLock(tokenIds, durations, bgContracts);
+
+        uint256 lockBlockTwo = stakingContract.lockBlocks(
+            Staking.BGContract(bgContracts[0]),
+            tokenIds[0]
+        );
+
+        assertEq(lockBlockTwo, newBlockNumber);
+    }
+
+    // TODO
+    // user deposits, waits, locks, waits (lock doesn't expire),
+    // claims reward. ensure reward is accurate
+    function testComplexScenarioOne() public {}
+
+    // TODO
+    // user deposits, waits, locks, waits (lock expires), claims
+    // reward. ensure reward is accurate
+    function testComplexScenarioTwo() public {}
+
+    // TODO
+    // user deposits and locks, waits (lock doesn't expire),
+    // claims reward, waits (lock expires), claims reward.
+    // ensure rewards are accurate
+    function testComplexScenarioThree() public {}
 }
