@@ -643,17 +643,6 @@ contract StakingTest is DSTest {
         assertEq(rewards[2], 0);
     }
 
-    function testFailCalculateRewards() public {
-        uint256[] memory tokenIds = new uint256[](1);
-        tokenIds[0] = kidsIds[2];
-
-        uint8[] memory bgContracts = new uint8[](2);
-        bgContracts[0] = 0;
-        bgContracts[1] = 1;
-
-        stakingContract.calculateRewards(USER_ADDRESS, tokenIds, bgContracts);
-    }
-
     function testCalculateRewardsLocked() public {
         // deposit and lock some jpegs
         uint256[] memory tokenIds = new uint256[](3);
@@ -824,6 +813,14 @@ contract StakingTest is DSTest {
         assertEq(lockBlockTwo, newBlockNumber);
     }
 
+    // TODO
+    // use `lockDurationsByTokenId` and `locksOf` to determine
+    // whether a lock has expired
+    // function testReadLockDurationsByTokenId() public {}
+
+    // TODO
+    // function testExtendExistingLock() public {}
+
     // user deposits, waits, locks, waits (lock doesn't expire),
     // claims reward. ensure reward is accurate
     function testComplexScenarioOne() public {
@@ -941,4 +938,7 @@ contract StakingTest is DSTest {
 
         cheats.stopPrank();
     }
+
+    // TODO
+    // function testComplexScenarioFour() public {}
 }

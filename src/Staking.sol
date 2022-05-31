@@ -15,7 +15,7 @@ interface IGum {
 }
 
 /**
- * @notice Accept deposits of BubblegumKid and BubblegumPuppy NFTs
+ * @notice Accept deposits of Bubblegum Kid and Bubblegum Puppy NFTs
  * ("staking") in exchange for GUM token rewards. Staked NFTs can
  * also be "locked," preventing their withdrawal for a period of time
  * in exchange for accelerated rewards. Thanks to the Sappy Seals team:
@@ -159,7 +159,7 @@ contract Staking is ERC721Holder, Ownable {
         // separately calculate `boostedRewards` (for locked NFTs) and
         // `regularRewards` (for NFTs that have been staked but not
         // locked -- see below). add them together to find total rewards
-        uint256 boostedRewards = 0;
+        uint256 boostedRewards;
         // is (or was) the NFT locked?
         if (_locks[account][bgContract].contains(tokenId)) {
             // when was the NFT locked?
@@ -237,10 +237,6 @@ contract Staking is ERC721Holder, Ownable {
         uint256[] calldata tokenIds,
         uint8[] calldata bgContracts
     ) public returns (uint256[] memory rewards) {
-        require(
-            tokenIds.length == bgContracts.length,
-            "argument lengths don't match"
-        );
         rewards = new uint256[](tokenIds.length);
         for (uint256 i; i < tokenIds.length; i++) {
             rewards[i] = getRewardsForToken(
@@ -291,10 +287,6 @@ contract Staking is ERC721Holder, Ownable {
         external
         onlyStarted
     {
-        require(
-            tokenIds.length == bgContracts.length,
-            "argument lengths don't match"
-        );
         address account = msg.sender;
         for (uint256 i; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
@@ -335,10 +327,6 @@ contract Staking is ERC721Holder, Ownable {
     {
         claimRewards(tokenIds, bgContracts);
         address account = msg.sender;
-        require(
-            tokenIds.length == bgContracts.length,
-            "argument lengths don't match"
-        );
         for (uint256 i; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
             BGContract bgContract = BGContract(bgContracts[i]);
