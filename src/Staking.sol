@@ -127,6 +127,11 @@ contract Staking is ERC721Holder, Ownable {
         emit StakeRewardRateUpdated(_stakeRewardRate);
     }
 
+    /**
+     * @dev Mint GUM token rewards
+     * @param to The recipient's ethereum address
+     * @param amount The amount to mint
+     */
     function _reward(address to, uint256 amount) internal {
         IGum(gumToken).mint(to, amount);
     }
@@ -137,7 +142,7 @@ contract Staking is ERC721Holder, Ownable {
      * @param account The user's ethereum address
      * @param tokenId The NFT's id
      * @param _bgContract Kids (0) or Puppies (1)
-     * @return Rewards
+     * @return rewards
      */
     function getRewardsForToken(
         address account,
@@ -217,6 +222,16 @@ contract Staking is ERC721Holder, Ownable {
         return regularRewards + boostedRewards;
     }
 
+    /**
+     * @dev Calculate accrued GUM token rewards for a set
+     * of BGK and BGP NFTs
+     * @param account The user's ethereum address
+     * @param tokenIds The NFTs' ids
+     * @param bgContracts The NFTs' contracts -- Kids (0)
+     * or Puppies (1) -- with indices corresponding to those
+     * of `tokenIds`
+     * @return rewards
+     */
     function calculateRewards(
         address account,
         uint256[] calldata tokenIds,
@@ -236,6 +251,16 @@ contract Staking is ERC721Holder, Ownable {
         }
     }
 
+    /**
+     * @dev Claim accrued GUM token rewards for a set
+     * of BGK and BGP NFTs -- if caller's rewards are
+     * greater than 0, balance will be transferred to
+     * caller's address
+     * @param tokenIds The NFTs' ids
+     * @param bgContracts The NFTs' contracts -- Kids (0)
+     * or Puppies (1) -- with indices corresponding to those
+     * of `tokenIds`
+     */
     function claimRewards(
         uint256[] calldata tokenIds,
         uint8[] calldata bgContracts
@@ -254,6 +279,14 @@ contract Staking is ERC721Holder, Ownable {
         }
     }
 
+    /**
+     * @dev Deposit ("stake") a set of BGK and BGP NFTs. Caller
+     * must be the owner of the NFTs supplied as arguments.
+     * @param tokenIds The NFTs' ids
+     * @param bgContracts The NFTs' contracts -- Kids (0)
+     * or Puppies (1) -- with indices corresponding to those
+     * of `tokenIds`
+     */
     function deposit(uint256[] calldata tokenIds, uint8[] calldata bgContracts)
         external
         onlyStarted
@@ -286,6 +319,17 @@ contract Staking is ERC721Holder, Ownable {
         emit Deposited(account, tokenIds, bgContracts);
     }
 
+    /**
+     * @dev Withdraw ("unstake") a set of deposited BGK and BGP
+     * NFTs. Calling `withdraw` automatically claims accrued
+     * rewards on the NFTs supplied as arguments. Caller must
+     * have deposited the NFTs, and they must not be subject
+     * to unexpired locks.
+     * @param tokenIds The NFTs' ids
+     * @param bgContracts The NFTs' contracts -- Kids (0)
+     * or Puppies (1) -- with indices corresponding to those
+     * of `tokenIds`
+     */
     function withdraw(uint256[] calldata tokenIds, uint8[] calldata bgContracts)
         external
     {
@@ -332,6 +376,14 @@ contract Staking is ERC721Holder, Ownable {
         }
     }
 
+    /**
+     * @dev Get the ids of Kid and Puppy NFTs staked by the
+     * user supplied in the `account` argument
+     * @param account The depositor's ethereum address
+     * @return bgContracts The ids of the deposited NFTs,
+     * as an array: the first item is an array of Kid ids,
+     * the second an array of Pup ids
+     */
     function depositsOf(address account)
         external
         view
@@ -354,6 +406,22 @@ contract Staking is ERC721Holder, Ownable {
         return [bgkIds, bgpIds];
     }
 
+    /**
+     * @dev Lock a set of deposited BGK and BGP NFTs. This
+     * will prevent them from being withdrawn for the
+     * periods of time supplied (indirectly) via the `durations`
+     * argument, in exchange for accelerated rewards (see
+     * `lockBoostRates`). Caller must have deposited the NFTs.
+     * @param tokenIds The NFTs' ids
+     * @param durations The durations for which the NFTs should
+     * be locked, with indices corresponding to those of
+     * `tokenIds`. Each "duration" represents an index that will
+     * be used to access values on `lockDurationsConfig` and
+     * `lockBoostRates`
+     * @param bgContracts The NFTs' contracts -- Kids (0)
+     * or Puppies (1) -- with indices corresponding to those
+     * of `tokenIds`
+     */
     function lock(
         uint256[] calldata tokenIds,
         uint256[] calldata durations,
@@ -380,6 +448,16 @@ contract Staking is ERC721Holder, Ownable {
         emit Locked(account, tokenIds, durations, bgContracts);
     }
 
+    /**
+     * @dev Get the ids of Kid and Puppy NFTs locked by the
+     * user supplied in the `account` argument, whether the
+     * locks are expired or not. Use `lockDurationsByTokenId`
+     * to determine whether a lock has expired.
+     * @param account The depositor's ethereum address
+     * @return bgContracts The ids of the locked NFTs,
+     * as an array: the first item is an array of Kid ids,
+     * the second an array of Pup ids
+     */
     function locksOf(address account)
         external
         view
@@ -402,6 +480,21 @@ contract Staking is ERC721Holder, Ownable {
         return [bgkIds, bgpIds];
     }
 
+    /**
+     * @dev Combine the `deposit` and `lock` functions to save
+     * users a transaction. Note that this function doesn't
+     * claim rewards like `lock` does, since the NFTs aren't
+     * already staked. (If they are, function will error.)
+     * @param tokenIds The NFTs' ids
+     * @param durations The durations for which the NFTs should
+     * be locked, with indices corresponding to those of
+     * `tokenIds`. Each "duration" represents an index that will
+     * be used to access values on `lockDurationsConfig` and
+     * `lockBoostRates`
+     * @param bgContracts The NFTs' contracts -- Kids (0)
+     * or Puppies (1) -- with indices corresponding to those
+     * of `tokenIds`
+     */
     function depositAndLock(
         uint256[] calldata tokenIds,
         uint256[] calldata durations,
