@@ -285,6 +285,10 @@ contract StakingTest is DSTest {
         stakingContract.deposit(tokenIds, bgContracts);
     }
 
+    // TODO
+    // don't let a user re-deposit a jpeg they've already staked ... or do?
+    // function testFailRedeposit() public {}
+
     function testWithdraw() public {
         // setup: deposit some jpegs
         uint256[] memory depositTokenIds = new uint256[](3);

@@ -33,6 +33,8 @@ contract Staking is ERC721Holder, Ownable {
         BGP
     }
 
+    uint256 public constant GUM_TOKEN_DECIMALS = 18;
+
     address public gumToken;
 
     bool public started;
@@ -97,14 +99,20 @@ contract Staking is ERC721Holder, Ownable {
         emit Stopped();
     }
 
+    function unsafe_inc(uint256 x) private pure returns (uint256) {
+        unchecked { return x + 1; }
+    }
+
     /**
      * @dev Change the address of the reward token contract (must
-     * support ERC20 functions named in IGum interface).
+     * support ERC20 functions named in IGum interface and conform
+     * to hardcoded GUM_TOKEN_DECIMALS constant).
      */
     function updateGumToken(address _gumToken) public onlyOwner {
         gumToken = _gumToken;
         emit GumTokenUpdated(_gumToken);
     }
+
 
     function updateLockBoostRates(uint256 lockBoostRate, uint256 index)
         public
@@ -148,7 +156,7 @@ contract Staking is ERC721Holder, Ownable {
         address account,
         uint256 tokenId,
         uint8 _bgContract
-    ) internal returns (uint256) {
+    ) internal view returns (uint256) {
         BGContract bgContract = BGContract(_bgContract);
         // the user has not staked this nft
         if (!_deposits[account][bgContract].contains(tokenId)) {
@@ -184,10 +192,6 @@ contract Staking is ERC721Holder, Ownable {
             uint256 endingBlock = lockBlock + durationDays * 6000;
             if (endingBlock > block.number) {
                 endingBlock = block.number;
-            } else {
-                // if the lock has expired, remove the NFT from `lockBlocks`
-                // to save gas on next claim
-                _locks[account][bgContract].remove(tokenId);
             }
             // how many days have passed from initial lock or last claim
             // to the ending block?
@@ -209,7 +213,7 @@ contract Staking is ERC721Holder, Ownable {
             }
             // calculate boosted rewards
             boostedRewards =
-                (boostedRewards * 10**uint256(IGum(gumToken).decimals())) /
+                (boostedRewards * 10**GUM_TOKEN_DECIMALS) /
                 1000;
         }
         // how many days have elapsed since the NFT was deposited or
@@ -218,7 +222,7 @@ contract Staking is ERC721Holder, Ownable {
         // calculate regular deposit rewards
         uint256 regularRewards = stakeRewardRate *
             depositDaysElapsed *
-            10**uint256(IGum(gumToken).decimals());
+            10**GUM_TOKEN_DECIMALS;
         return regularRewards + boostedRewards;
     }
 
@@ -236,9 +240,9 @@ contract Staking is ERC721Holder, Ownable {
         address account,
         uint256[] calldata tokenIds,
         uint8[] calldata bgContracts
-    ) public returns (uint256[] memory rewards) {
+    ) public view returns (uint256[] memory rewards) {
         rewards = new uint256[](tokenIds.length);
-        for (uint256 i; i < tokenIds.length; i++) {
+        for (uint256 i; i < tokenIds.length; i = unsafe_inc(i)) {
             rewards[i] = getRewardsForToken(
                 account,
                 tokenIds[i],
@@ -264,7 +268,7 @@ contract Staking is ERC721Holder, Ownable {
         uint256 amount;
         address to = msg.sender;
         uint256[] memory rewards = calculateRewards(to, tokenIds, bgContracts);
-        for (uint256 i; i < tokenIds.length; i++) {
+        for (uint256 i; i < tokenIds.length; i = unsafe_inc(i)) {
             BGContract bgContract = BGContract(bgContracts[i]);
             amount += rewards[i];
             depositBlocks[bgContract][tokenIds[i]] = block.number;
@@ -288,18 +292,18 @@ contract Staking is ERC721Holder, Ownable {
         onlyStarted
     {
         address account = msg.sender;
-        for (uint256 i; i < tokenIds.length; i++) {
+        for (uint256 i; i < tokenIds.length; i = unsafe_inc(i)) {
             uint256 tokenId = tokenIds[i];
             BGContract bgContract = BGContract(bgContracts[i]);
-            address nftAddress;
+            address bgContractAddress;
             if (bgContract == BGContract.BGK) {
-                nftAddress = BGK;
+                bgContractAddress = BGK;
             } else if (bgContract == BGContract.BGP) {
-                nftAddress = BGP;
+                bgContractAddress = BGP;
             } else {
-                revert("couldn't get nft contract address");
+                revert("unknown contract address");
             }
-            IERC721(nftAddress).safeTransferFrom(
+            IERC721(bgContractAddress).safeTransferFrom(
                 account,
                 address(this),
                 tokenId,
@@ -327,13 +331,16 @@ contract Staking is ERC721Holder, Ownable {
     {
         claimRewards(tokenIds, bgContracts);
         address account = msg.sender;
-        for (uint256 i; i < tokenIds.length; i++) {
+        for (uint256 i; i < tokenIds.length; i = unsafe_inc(i)) {
             uint256 tokenId = tokenIds[i];
             BGContract bgContract = BGContract(bgContracts[i]);
+            // TODO: necessary?
             require(
                 _deposits[account][bgContract].contains(tokenId),
                 "token not deposited"
             );
+            // if the token has an unexpired lock, don't allow
+            // withdrawal
             if (_locks[account][bgContract].contains(tokenId)) {
                 uint256 duration = lockDurationsConfig[
                     lockDurationsByTokenId[bgContract][tokenId]
@@ -341,19 +348,17 @@ contract Staking is ERC721Holder, Ownable {
                 uint256 daysElapsed = (block.number -
                     lockBlocks[bgContract][tokenId]) / 6000;
                 require(daysElapsed >= duration, "token still locked");
-                // this line can likely be removed, since `claimRewards`
-                // removes expired locks
-                _locks[account][bgContract].remove(tokenId);
             }
             _deposits[account][bgContract].remove(tokenId);
             lockDurationsByTokenId[bgContract][tokenId] = 0;
+            _locks[account][bgContract].remove(tokenId);
             address nftAddress;
             if (bgContract == BGContract.BGK) {
                 nftAddress = BGK;
             } else if (bgContract == BGContract.BGP) {
                 nftAddress = BGP;
             } else {
-                revert("couldn't get nft contract address");
+                revert("unknown contract address");
             }
             IERC721(nftAddress).safeTransferFrom(
                 address(this),
@@ -381,14 +386,14 @@ contract Staking is ERC721Holder, Ownable {
             BGContract.BGK
         ];
         uint256[] memory bgkIds = new uint256[](bgkDepositSet.length());
-        for (uint256 i; i < bgkDepositSet.length(); i++) {
+        for (uint256 i; i < bgkDepositSet.length(); i = unsafe_inc(i)) {
             bgkIds[i] = bgkDepositSet.at(i);
         }
         EnumerableSet.UintSet storage bgpDepositSet = _deposits[account][
             BGContract.BGP
         ];
         uint256[] memory bgpIds = new uint256[](bgpDepositSet.length());
-        for (uint256 i; i < bgpDepositSet.length(); i++) {
+        for (uint256 i; i < bgpDepositSet.length(); i = unsafe_inc(i)) {
             bgpIds[i] = bgpDepositSet.at(i);
         }
         return [bgkIds, bgpIds];
@@ -415,14 +420,9 @@ contract Staking is ERC721Holder, Ownable {
         uint256[] calldata durations,
         uint8[] calldata bgContracts
     ) external onlyStarted {
-        require(
-            tokenIds.length == durations.length &&
-                tokenIds.length == bgContracts.length,
-            "argument lengths don't match"
-        );
         claimRewards(tokenIds, bgContracts);
         address account = msg.sender;
-        for (uint256 i; i < tokenIds.length; i++) {
+        for (uint256 i; i < tokenIds.length; i = unsafe_inc(i)) {
             uint256 tokenId = tokenIds[i];
             BGContract bgContract = BGContract(bgContracts[i]);
             require(
@@ -455,14 +455,14 @@ contract Staking is ERC721Holder, Ownable {
             BGContract.BGK
         ];
         uint256[] memory bgkIds = new uint256[](bgkLockSet.length());
-        for (uint256 i; i < bgkLockSet.length(); i++) {
+        for (uint256 i; i < bgkLockSet.length(); i = unsafe_inc(i)) {
             bgkIds[i] = bgkLockSet.at(i);
         }
         EnumerableSet.UintSet storage bgpLockSet = _locks[account][
             BGContract.BGP
         ];
         uint256[] memory bgpIds = new uint256[](bgpLockSet.length());
-        for (uint256 i; i < bgpLockSet.length(); i++) {
+        for (uint256 i; i < bgpLockSet.length(); i = unsafe_inc(i)) {
             bgpIds[i] = bgpLockSet.at(i);
         }
         return [bgkIds, bgpIds];
@@ -488,15 +488,11 @@ contract Staking is ERC721Holder, Ownable {
         uint256[] calldata durations,
         uint8[] calldata bgContracts
     ) external onlyStarted {
-        require(
-            tokenIds.length == durations.length &&
-                tokenIds.length == bgContracts.length,
-            "argument lengths don't match"
-        );
         address account = msg.sender;
-        for (uint256 i; i < tokenIds.length; i++) {
+        for (uint256 i; i < tokenIds.length; i = unsafe_inc(i)) {
             uint256 tokenId = tokenIds[i];
             BGContract bgContract = BGContract(bgContracts[i]);
+            // TODO: necessary? (both requires)
             require(
                 !_locks[account][bgContract].contains(tokenId),
                 "token already locked"
@@ -516,7 +512,7 @@ contract Staking is ERC721Holder, Ownable {
             } else if (bgContract == BGContract.BGP) {
                 nftAddress = BGP;
             } else {
-                revert("couldn't get nft contract address");
+                revert("unknown contract address");
             }
             IERC721(nftAddress).safeTransferFrom(
                 account,
