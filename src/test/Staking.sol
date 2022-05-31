@@ -771,22 +771,23 @@ contract StakingTest is DSTest {
             tokenIds[0]
         );
 
-        // TODO: check `locks` too
-
         assertEq(lockBlockOne, oldBlockNumber);
 
         // roll forward till after lock's expired
         cheats.roll(newBlockNumber);
 
+        // withdraw
         cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
         stakingContract.withdraw(tokenIds, bgContracts);
 
+        // send to another user
         kids.setApprovalForAll(TRANSFER_ADDRESS, true);
         cheats.stopPrank();
 
         cheats.prank(TRANSFER_ADDRESS);
         kids.safeTransferFrom(USER_ADDRESS, USER_ADDRESS_TWO, tokenIds[0]);
 
+        // next user deposits and locks jpeg
         cheats.prank(USER_ADDRESS_TWO);
         stakingContract.depositAndLock(tokenIds, durations, bgContracts);
 
@@ -795,22 +796,125 @@ contract StakingTest is DSTest {
             tokenIds[0]
         );
 
+        // ensure that lock block has updated
         assertEq(lockBlockTwo, newBlockNumber);
     }
 
-    // TODO
     // user deposits, waits, locks, waits (lock doesn't expire),
     // claims reward. ensure reward is accurate
-    function testComplexScenarioOne() public {}
+    function testComplexScenarioOne() public {
+        // deposit a jpeg
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = kidsIds[8];
 
-    // TODO
-    // user deposits, waits, locks, waits (lock expires), claims
-    // reward. ensure reward is accurate
-    function testComplexScenarioTwo() public {}
+        uint8[] memory bgContracts = new uint8[](1);
+        bgContracts[0] = 0;
 
-    // TODO
+        uint256[] memory durations = new uint256[](1);
+        durations[0] = 3;
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+        stakingContract.deposit(tokenIds, bgContracts);
+
+        // roll forward "one week"
+        cheats.roll(block.number + 6000 * 7);
+
+        // rewards so far: 7 gum
+
+        // lock till the end of days
+        stakingContract.lock(tokenIds, durations, bgContracts);
+
+        // roll forward another "week"
+        cheats.roll(block.number + 6000 * 7);
+
+        // rewards so far: 7 + 7 * 1.4 => 16.8 gum
+
+        stakingContract.claimRewards(tokenIds, bgContracts);
+
+        uint256 gumBalance = gumContract.balanceOf(USER_ADDRESS);
+        assertEq(gumBalance, 168 * (10**17));
+
+        cheats.stopPrank();
+    }
+
+    // user deposits, waits, locks, waits (lock expires, then some),
+    // claims reward. ensure reward is accurate
+    function testComplexScenarioTwo() public {
+        // deposit a jpeg
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = kidsIds[8];
+
+        uint8[] memory bgContracts = new uint8[](1);
+        bgContracts[0] = 0;
+
+        uint256[] memory durations = new uint256[](1);
+        durations[0] = 1;
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+        stakingContract.deposit(tokenIds, bgContracts);
+
+        // roll forward "one week"
+        cheats.roll(block.number + 6000 * 7);
+
+        // rewards so far: 7 gum
+
+        // lock for a spell
+        stakingContract.lock(tokenIds, durations, bgContracts);
+
+        // roll forward another "two months"
+        cheats.roll(block.number + 6000 * 60);
+
+        // rewards so far: 7 + 30 * 1.1 + 30 => 70 gum
+
+        stakingContract.claimRewards(tokenIds, bgContracts);
+
+        uint256 gumBalance = gumContract.balanceOf(USER_ADDRESS);
+        assertEq(gumBalance, 70 * (10**18));
+
+        cheats.stopPrank();
+    }
+
     // user deposits and locks, waits (lock doesn't expire),
-    // claims reward, waits (lock expires), claims reward.
-    // ensure rewards are accurate
-    function testComplexScenarioThree() public {}
+    // claims reward, waits (lock expires, then some),
+    // claims reward. ensure rewards are accurate
+    function testComplexScenarioThree() public {
+        // deposit a jpeg
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = kidsIds[8];
+
+        uint8[] memory bgContracts = new uint8[](1);
+        bgContracts[0] = 0;
+
+        uint256[] memory durations = new uint256[](1);
+        durations[0] = 1;
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+        stakingContract.depositAndLock(tokenIds, durations, bgContracts);
+
+        // roll forward a "week"
+        cheats.roll(block.number + 6000 * 7);
+
+        // rewards so far: 7 * 1.1 => 7.7 gum
+
+        stakingContract.claimRewards(tokenIds, bgContracts);
+
+        // roll forward another "week"
+        cheats.roll(block.number + 6000 * 7);
+
+        // rewards so far: 2 * (7 * 1.1) => 15.4 gum
+
+        stakingContract.claimRewards(tokenIds, bgContracts);
+
+        // roll forward another "month"
+        cheats.roll(block.number + 6000 * 30);
+
+        // rewards so far: 30 * 1.1 + 14 => 47 gum
+
+        stakingContract.claimRewards(tokenIds, bgContracts);
+
+        uint256 gumBalance = gumContract.balanceOf(USER_ADDRESS);
+        assertEq(gumBalance, 47 * (10**18));
+
+        cheats.stopPrank();
+    }
 }

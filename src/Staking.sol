@@ -191,7 +191,7 @@ contract Staking is ERC721Holder, Ownable {
             // if the user has claimed since locking, account for that
             // by calculating `remainingDurationDays`
             uint256 remainingDurationDays = durationDays -
-                (depositBlock - lockBlock) *
+                (depositBlock - lockBlock) /
                 6000;
             // if the remaining lock time hasn't elapsed, reward based on
             // elapsed days, otherwise reward based on `remainingDurationDays`.
