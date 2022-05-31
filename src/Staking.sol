@@ -100,7 +100,9 @@ contract Staking is ERC721Holder, Ownable {
     }
 
     function unsafe_inc(uint256 x) private pure returns (uint256) {
-        unchecked { return x + 1; }
+        unchecked {
+            return x + 1;
+        }
     }
 
     /**
@@ -112,7 +114,6 @@ contract Staking is ERC721Holder, Ownable {
         gumToken = _gumToken;
         emit GumTokenUpdated(_gumToken);
     }
-
 
     function updateLockBoostRates(uint256 lockBoostRate, uint256 index)
         public
@@ -212,9 +213,7 @@ contract Staking is ERC721Holder, Ownable {
                 boostedRewards = remainingDurationDays * boost;
             }
             // calculate boosted rewards
-            boostedRewards =
-                (boostedRewards * 10**GUM_TOKEN_DECIMALS) /
-                1000;
+            boostedRewards = (boostedRewards * 10**GUM_TOKEN_DECIMALS) / 1000;
         }
         // how many days have elapsed since the NFT was deposited or
         // rewards were claimed?
@@ -334,7 +333,6 @@ contract Staking is ERC721Holder, Ownable {
         for (uint256 i; i < tokenIds.length; i = unsafe_inc(i)) {
             uint256 tokenId = tokenIds[i];
             BGContract bgContract = BGContract(bgContracts[i]);
-            // TODO: necessary?
             require(
                 _deposits[account][bgContract].contains(tokenId),
                 "token not deposited"
@@ -492,15 +490,6 @@ contract Staking is ERC721Holder, Ownable {
         for (uint256 i; i < tokenIds.length; i = unsafe_inc(i)) {
             uint256 tokenId = tokenIds[i];
             BGContract bgContract = BGContract(bgContracts[i]);
-            // TODO: necessary? (both requires)
-            require(
-                !_locks[account][bgContract].contains(tokenId),
-                "token already locked"
-            );
-            require(
-                !_deposits[account][bgContract].contains(tokenId),
-                "token already deposited"
-            );
             _deposits[account][bgContract].add(tokenId);
             depositBlocks[bgContract][tokenId] = block.number;
             _locks[account][bgContract].add(tokenId);

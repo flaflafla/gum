@@ -285,12 +285,54 @@ contract StakingTest is DSTest {
         stakingContract.deposit(tokenIds, bgContracts);
     }
 
-    // TODO
-    // don't let a user re-deposit a jpeg they've already staked ... or do?
-    // function testFailRedeposit() public {}
+    // don't let a user re-deposit a jpeg they've already staked
+    function testFailRedeposit() public {
+        // deposit a jpeg
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = pupsIds[7];
+
+        uint8[] memory bgContracts = new uint8[](1);
+        bgContracts[0] = 1;
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+        stakingContract.deposit(tokenIds, bgContracts);
+
+        // wait
+        cheats.roll(block.number + 6000);
+
+        // try to redeposit
+        stakingContract.deposit(tokenIds, bgContracts);
+
+        cheats.stopPrank();
+    }
+
+    // don't let a user re-deposit a jpeg they've already staked
+    // (using `depositAndLock` function)
+    function testFailRedepositAndLock() public {
+        // deposit a jpeg
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = pupsIds[7];
+
+        uint8[] memory bgContracts = new uint8[](1);
+        bgContracts[0] = 1;
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+        stakingContract.deposit(tokenIds, bgContracts);
+
+        // wait
+        cheats.roll(block.number + 6000);
+
+        uint256[] memory durations = new uint256[](1);
+        durations[0] = 1;
+
+        // try to redeposit and lock
+        stakingContract.depositAndLock(tokenIds, durations, bgContracts);
+
+        cheats.stopPrank();
+    }
 
     function testWithdraw() public {
-        // setup: deposit some jpegs
+        // deposit some jpegs
         uint256[] memory depositTokenIds = new uint256[](3);
         depositTokenIds[0] = kidsIds[2];
         depositTokenIds[1] = pupsIds[1];
@@ -358,7 +400,7 @@ contract StakingTest is DSTest {
     }
 
     function testWithdrawWithRewards() public {
-        // setup: deposit some jpegs
+        // deposit some jpegs
         uint256[] memory tokenIds = new uint256[](3);
         tokenIds[0] = kidsIds[2];
         tokenIds[1] = pupsIds[1];
@@ -460,7 +502,7 @@ contract StakingTest is DSTest {
     }
 
     function testLock() public {
-        // setup: deposit some jpegs
+        // deposit some jpegs
         uint256[] memory tokenIds = new uint256[](3);
         tokenIds[0] = kidsIds[2];
         tokenIds[1] = pupsIds[1];
@@ -817,13 +859,117 @@ contract StakingTest is DSTest {
         assertEq(lockBlockTwo, newBlockNumber);
     }
 
-    // TODO
-    // use `lockDurationsByTokenId` and `locksOf` to determine
-    // whether a lock has expired
-    // function testReadLockDurationsByTokenId() public {}
+    // use `lockDurationsByTokenId`, `lockBlocks` and `locksOf`
+    // to determine whether a lock has expired
+    function testCheckLockExpiration() public {
+        // deposit and lock a jpeg
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = pupsIds[4];
 
-    // TODO
-    // function testExtendExistingLock() public {}
+        uint8[] memory bgContracts = new uint8[](1);
+        bgContracts[0] = 1;
+
+        uint256[] memory durations = new uint256[](1);
+        durations[0] = 2;
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+        stakingContract.depositAndLock(tokenIds, durations, bgContracts);
+
+        // roll forward a "week"
+        cheats.roll(block.number + 6000 * 7);
+
+        uint256[][2] memory userLocks = stakingContract.locksOf(USER_ADDRESS);
+        uint256 lockedTokenId = userLocks[bgContracts[0]][0];
+        uint256 lockedTokenDuration = stakingContract.lockDurationsByTokenId(
+            Staking.BGContract(bgContracts[0]),
+            lockedTokenId
+        );
+        uint256 lockedTokenDurationInDays = stakingContract.lockDurationsConfig(
+            lockedTokenDuration
+        );
+        uint256 lockedTokenBlock = stakingContract.lockBlocks(
+            Staking.BGContract(bgContracts[0]),
+            lockedTokenId
+        );
+        uint256 daysSinceLock = (block.number - lockedTokenBlock) / 6000;
+        bool tokenIsExpired = daysSinceLock >= lockedTokenDurationInDays;
+        assert(!tokenIsExpired);
+
+        // roll forward past expiration
+        cheats.roll(block.number + 6000 * 84);
+
+        uint256 newDaysSinceLock = (block.number - lockedTokenBlock) / 6000;
+        bool newTokenIsExpired = newDaysSinceLock >= lockedTokenDurationInDays;
+        assert(newTokenIsExpired);
+
+        cheats.stopPrank();
+    }
+
+    function testExtendExistingLock() public {
+        // deposit and lock a jpeg
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = pupsIds[0];
+
+        uint8[] memory bgContracts = new uint8[](1);
+        bgContracts[0] = 1;
+
+        uint256[] memory durations = new uint256[](1);
+        durations[0] = 1;
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+        stakingContract.depositAndLock(tokenIds, durations, bgContracts);
+
+        // get initial lock block
+        uint256 lockedTokenBlockBefore = stakingContract.lockBlocks(
+            Staking.BGContract(bgContracts[0]),
+            tokenIds[0]
+        );
+
+        // get initial lock duration
+        uint256 lockedTokenDurationBefore = stakingContract
+            .lockDurationsByTokenId(
+                Staking.BGContract(bgContracts[0]),
+                tokenIds[0]
+            );
+        // check it's as expected
+        assertEq(durations[0], lockedTokenDurationBefore);
+
+        // check initial user locks
+        uint256[][2] memory locksBefore = stakingContract.locksOf(USER_ADDRESS);
+        assertEq(locksBefore[bgContracts[0]][0], tokenIds[0]);
+
+        // roll forward a "week"
+        cheats.roll(block.number + 6000 * 7);
+
+        // relock for longer duration
+        uint256[] memory extendedDurations = new uint256[](1);
+        extendedDurations[0] = 2;
+
+        stakingContract.lock(tokenIds, extendedDurations, bgContracts);
+
+        // get updated lock block
+        uint256 lockedTokenBlockAfter = stakingContract.lockBlocks(
+            Staking.BGContract(bgContracts[0]),
+            tokenIds[0]
+        );
+        // check it's later than initial lock block
+        assertLt(lockedTokenBlockBefore, lockedTokenBlockAfter);
+
+        // get updated lock duration
+        uint256 lockedTokenDurationAfter = stakingContract
+            .lockDurationsByTokenId(
+                Staking.BGContract(bgContracts[0]),
+                tokenIds[0]
+            );
+        // check it's as expected
+        assertEq(extendedDurations[0], lockedTokenDurationAfter);
+
+        // check updated user locks
+        uint256[][2] memory locksAfter = stakingContract.locksOf(USER_ADDRESS);
+        assertEq(locksAfter[bgContracts[0]][0], tokenIds[0]);
+
+        cheats.stopPrank();
+    }
 
     // user deposits, waits, locks, waits (lock doesn't expire),
     // claims reward. ensure reward is accurate
@@ -903,7 +1049,7 @@ contract StakingTest is DSTest {
     // claims reward, waits (lock expires, then some),
     // claims reward. ensure rewards are accurate
     function testComplexScenarioThree() public {
-        // deposit a jpeg
+        // deposit and lock a jpeg
         uint256[] memory tokenIds = new uint256[](1);
         tokenIds[0] = kidsIds[8];
 
@@ -942,7 +1088,4 @@ contract StakingTest is DSTest {
 
         cheats.stopPrank();
     }
-
-    // TODO
-    // function testComplexScenarioFour() public {}
 }
