@@ -619,6 +619,30 @@ contract StakingTest is DSTest {
         assertEq(rewards[2], 3 * 10**18);
     }
 
+    function testCalculateRewardsUnstaked() public {
+        uint256[] memory tokenIds = new uint256[](3);
+        tokenIds[0] = kidsIds[0];
+        tokenIds[1] = kidsIds[1];
+        tokenIds[2] = pupsIds[0];
+
+        uint8[] memory bgContracts = new uint8[](3);
+        bgContracts[0] = 0;
+        bgContracts[1] = 0;
+        bgContracts[2] = 1;
+
+        // don't deposit the jpegs
+
+        uint256[] memory rewards = stakingContract.calculateRewards(
+            USER_ADDRESS,
+            tokenIds,
+            bgContracts
+        );
+
+        assertEq(rewards[0], 0);
+        assertEq(rewards[1], 0);
+        assertEq(rewards[2], 0);
+    }
+
     function testFailCalculateRewards() public {
         uint256[] memory tokenIds = new uint256[](1);
         tokenIds[0] = kidsIds[2];
