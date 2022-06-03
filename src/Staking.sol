@@ -24,8 +24,8 @@ interface IGum {
 contract Staking is ERC721Holder, Ownable {
     using EnumerableSet for EnumerableSet.UintSet;
 
-    address public constant BGK = 0xa5ae87B40076745895BB7387011ca8DE5fde37E0;
-    address public constant BGP = 0x86e9C5ad3D4b5519DA2D2C19F5c71bAa5Ef40933;
+    address public constant BGK = 0x13A5f9A34A5597Ac821f551447446d363A945569;
+    address public constant BGP = 0xF0A2f967a55492b3dB4FFBF1EE7de6bD5Cf34009;
     enum BGContract {
         BGK,
         BGP
