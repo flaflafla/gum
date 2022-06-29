@@ -1088,4 +1088,43 @@ contract StakingTest is DSTest {
 
         cheats.stopPrank();
     }
+
+    // user tries to claim rewards for same token multiple times
+    // make sure the amount rewarded is correct
+    function testMultipleClaimVulnerability() public {
+        // deposit a jpeg
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = kidsIds[8];
+
+        uint8[] memory bgContracts = new uint8[](1);
+        bgContracts[0] = 0;
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+        stakingContract.deposit(tokenIds, bgContracts);
+
+        // roll forward "one week"
+        cheats.roll(block.number + 6000 * 7);
+
+        // try to claim same token rewards four times
+        uint256[] memory claimTokenIds = new uint256[](4);
+        claimTokenIds[0] = kidsIds[8];
+        claimTokenIds[1] = kidsIds[8];
+        claimTokenIds[2] = kidsIds[8];
+        claimTokenIds[3] = kidsIds[8];
+
+        uint8[] memory claimBgContracts = new uint8[](4);
+        claimBgContracts[0] = 0;
+        claimBgContracts[1] = 0;
+        claimBgContracts[2] = 0;
+        claimBgContracts[3] = 0;
+
+        stakingContract.claimRewards(claimTokenIds, claimBgContracts);
+
+        uint256 gumBalance = gumContract.balanceOf(USER_ADDRESS);
+
+        // only pay correct token rewards
+        assertEq(gumBalance, 7 * (10**18));
+
+        cheats.stopPrank();
+    }
 }

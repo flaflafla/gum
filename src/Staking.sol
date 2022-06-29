@@ -238,13 +238,25 @@ contract Staking is ERC721Holder, Ownable {
         uint256[] calldata tokenIds,
         uint8[] calldata bgContracts
     ) public view returns (uint256[] memory rewards) {
+        uint256[] memory claimedIds = new uint256[](tokenIds.length);
         rewards = new uint256[](tokenIds.length);
         for (uint256 i; i < tokenIds.length; i = unsafe_inc(i)) {
+            bool alreadyClaimed;
+            for (uint256 j; j < claimedIds.length; j = unsafe_inc(j)) {
+                if (claimedIds[j] == tokenIds[i]) {
+                    alreadyClaimed = true;
+                }
+            }
+            if (alreadyClaimed) {
+                rewards[i] = 0;
+                continue;
+            }
             rewards[i] = getRewardsForToken(
                 account,
                 tokenIds[i],
                 bgContracts[i]
             );
+            claimedIds[i] = tokenIds[i];
         }
     }
 
