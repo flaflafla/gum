@@ -259,13 +259,13 @@ contract Staking is ERC721Holder, Ownable {
         uint256 amount;
         for (uint8 i; i < 2; i++) {
             BGContract bgContract = BGContract(i);
-            for (uint256 j; j < _deposits[account][bgContract].length(); j = unsafe_inc(j)) {
+            for (
+                uint256 j;
+                j < _deposits[account][bgContract].length();
+                j = unsafe_inc(j)
+            ) {
                 uint256 tokenId = _deposits[account][bgContract].at(j);
-                amount += (getRewardsForToken(
-                    account,
-                    tokenId,
-                    i
-                ));
+                amount += (getRewardsForToken(account, tokenId, i));
                 depositBlocks[bgContract][tokenId] = block.number;
             }
         }
