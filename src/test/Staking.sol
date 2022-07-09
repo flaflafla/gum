@@ -747,15 +747,14 @@ contract StakingTest is DSTest {
         cheats.roll(block.number + 6000 * 14);
 
         cheats.prank(USER_ADDRESS);
-        stakingContract.claimRewards(tokenIds, bgContracts);
+        stakingContract.claimRewards();
 
         uint256 gumBalance = gumContract.balanceOf(USER_ADDRESS);
         assertEq(gumBalance, (154 + 175 + 196) * (10**17));
     }
 
     // make sure that after claiming rewards, deposit block
-    // for jpeg is updated -- or unchanged, if rewards aren't
-    // claimed
+    // for jpegs is updated
     function testReadDepositBlocks() public {
         // deposit some jpegs
         uint256[] memory tokenIds = new uint256[](2);
@@ -780,30 +779,20 @@ contract StakingTest is DSTest {
 
         cheats.roll(newBlockNumber);
 
-        // claim rewards for one jpeg
-        uint256[] memory claimTokenIds = new uint256[](1);
-        claimTokenIds[0] = tokenIds[0];
-
-        uint8[] memory claimBgContracts = new uint8[](1);
-        claimBgContracts[0] = bgContracts[0];
-
         cheats.prank(USER_ADDRESS);
-        stakingContract.claimRewards(claimTokenIds, claimBgContracts);
+        stakingContract.claimRewards();
 
-        // deposit block should be updated for jpeg for
-        // which rewards were claimed
-        uint256 claimedDepositBlock = stakingContract.depositBlocks(
-            Staking.BGContract(claimBgContracts[0]),
-            claimTokenIds[0]
+        // deposit block should be updated for jpegs
+        uint256 claimedDepositBlockOne = stakingContract.depositBlocks(
+            Staking.BGContract(bgContracts[0]),
+            tokenIds[0]
         );
-        assertEq(claimedDepositBlock, newBlockNumber);
-
-        // deposit block should be unchanged for other jpeg
-        uint256 unclaimedDepositBlock = stakingContract.depositBlocks(
+        uint256 claimedDepositBlockTwo = stakingContract.depositBlocks(
             Staking.BGContract(bgContracts[1]),
             tokenIds[1]
         );
-        assertEq(unclaimedDepositBlock, oldBlockNumber);
+        assertEq(claimedDepositBlockOne, newBlockNumber);
+        assertEq(claimedDepositBlockTwo, newBlockNumber);
     }
 
     // make sure that after a jpeg is relocked, lock block
@@ -1000,7 +989,7 @@ contract StakingTest is DSTest {
 
         // rewards so far: 7 + 7 * 1.4 => 16.8 gum
 
-        stakingContract.claimRewards(tokenIds, bgContracts);
+        stakingContract.claimRewards();
 
         uint256 gumBalance = gumContract.balanceOf(USER_ADDRESS);
         assertEq(gumBalance, 168 * (10**17));
@@ -1037,7 +1026,7 @@ contract StakingTest is DSTest {
 
         // rewards so far: 7 + 30 * 1.1 + 30 => 70 gum
 
-        stakingContract.claimRewards(tokenIds, bgContracts);
+        stakingContract.claimRewards();
 
         uint256 gumBalance = gumContract.balanceOf(USER_ADDRESS);
         assertEq(gumBalance, 70 * (10**18));
@@ -1067,21 +1056,21 @@ contract StakingTest is DSTest {
 
         // rewards so far: 7 * 1.1 => 7.7 gum
 
-        stakingContract.claimRewards(tokenIds, bgContracts);
+        stakingContract.claimRewards();
 
         // roll forward another "week"
         cheats.roll(block.number + 6000 * 7);
 
         // rewards so far: 2 * (7 * 1.1) => 15.4 gum
 
-        stakingContract.claimRewards(tokenIds, bgContracts);
+        stakingContract.claimRewards();
 
         // roll forward another "month"
         cheats.roll(block.number + 6000 * 30);
 
         // rewards so far: 30 * 1.1 + 14 => 47 gum
 
-        stakingContract.claimRewards(tokenIds, bgContracts);
+        stakingContract.claimRewards();
 
         uint256 gumBalance = gumContract.balanceOf(USER_ADDRESS);
         assertEq(gumBalance, 47 * (10**18));

@@ -249,30 +249,29 @@ contract Staking is ERC721Holder, Ownable {
     }
 
     /**
-     * @dev Claim accrued GUM token rewards for a set
-     * of BGK and BGP NFTs -- if caller's rewards are
+     * @dev Claim accrued GUM token rewards for all
+     * staked BGK and BGP NFTs -- if caller's rewards are
      * greater than 0, balance will be transferred to
      * caller's address
-     * @param tokenIds The NFTs' ids
-     * @param bgContracts The NFTs' contracts -- Kids (0)
-     * or Puppies (1) -- with indices corresponding to those
-     * of `tokenIds`
      */
-    function claimRewards(
-        uint256[] calldata tokenIds,
-        uint8[] calldata bgContracts
-    ) public {
+    function claimRewards() public {
+        address account = msg.sender;
         uint256 amount;
-        address to = msg.sender;
-        uint256[] memory rewards = calculateRewards(to, tokenIds, bgContracts);
-        for (uint256 i; i < tokenIds.length; i = unsafe_inc(i)) {
-            BGContract bgContract = BGContract(bgContracts[i]);
-            amount += rewards[i];
-            depositBlocks[bgContract][tokenIds[i]] = block.number;
+        for (uint8 i; i < 2; i++) {
+            BGContract bgContract = BGContract(i);
+            for (
+                uint256 j;
+                j < _deposits[account][bgContract].length();
+                j = unsafe_inc(j)
+            ) {
+                uint256 tokenId = _deposits[account][bgContract].at(j);
+                amount += (getRewardsForToken(account, tokenId, i));
+                depositBlocks[bgContract][tokenId] = block.number;
+            }
         }
         if (amount > 0) {
-            _reward(to, amount);
-            emit RewardClaimed(to, amount);
+            _reward(account, amount);
+            emit RewardClaimed(account, amount);
         }
     }
 
@@ -326,7 +325,7 @@ contract Staking is ERC721Holder, Ownable {
     function withdraw(uint256[] calldata tokenIds, uint8[] calldata bgContracts)
         external
     {
-        claimRewards(tokenIds, bgContracts);
+        claimRewards();
         address account = msg.sender;
         for (uint256 i; i < tokenIds.length; i = unsafe_inc(i)) {
             uint256 tokenId = tokenIds[i];
@@ -416,7 +415,7 @@ contract Staking is ERC721Holder, Ownable {
         uint256[] calldata durations,
         uint8[] calldata bgContracts
     ) external onlyStarted {
-        claimRewards(tokenIds, bgContracts);
+        claimRewards();
         address account = msg.sender;
         for (uint256 i; i < tokenIds.length; i = unsafe_inc(i)) {
             uint256 tokenId = tokenIds[i];
