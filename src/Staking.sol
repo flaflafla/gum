@@ -362,6 +362,7 @@ contract Staking is ERC721Holder, Ownable {
                 ""
             );
         }
+        emit Withdrawn(account, tokenIds);
     }
 
     /**
