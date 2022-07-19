@@ -10,4 +10,4 @@ deployed/verified on kovan testnet at [0xe5f1433b6eCc6bE74E413b54f4c1eA2671b1cA0
 
 `src/Staking.sol`
 
-deployed/verified on kovan testnet at [0xC77Aa4F7c4aeb709F045edC8fab54F4a6595f61E](https://kovan.etherscan.io/address/0xc77aa4f7c4aeb709f045edc8fab54f4a6595f61e#code)
+deployed/verified on kovan testnet at [0x5CdfD0B428b47AEB9Ba307355dA1e7971c62fa06](https://kovan.etherscan.io/address/0x5CdfD0B428b47AEB9Ba307355dA1e7971c62fa06#code)
