@@ -19,7 +19,7 @@ interface IGum {
  * in exchange for accelerated rewards. Thanks to the Sappy Seals team:
  * this contract is largely based on their staking contract at
  * 0xdf8A88212FF229446e003f8f879e263D3616b57A.
- * @dev Contract defines a "day" as 6000 ethereum blocks.
+ * @dev Contract defines a "day" as 7200 ethereum blocks.
  */
 contract Staking is ERC721Holder, Ownable {
     using EnumerableSet for EnumerableSet.UintSet;
@@ -47,7 +47,7 @@ contract Staking is ERC721Holder, Ownable {
     mapping(BGContract => mapping(uint256 => uint256)) public lockBlocks;
     mapping(BGContract => mapping(uint256 => uint256))
         public lockDurationsByTokenId;
-    // in "days" (multiples of 6000 blocks)
+    // in "days" (multiples of 7200 blocks)
     uint256[4] public lockDurationsConfig;
     // decimals == 3
     uint256[4] public lockBoostRates;
@@ -188,19 +188,19 @@ contract Staking is ERC721Holder, Ownable {
             // `endingBlock` is when rewards stop accruing. this is either the
             // block at which the lock expired, if it has expired, or the
             // current block, if it hasn't
-            uint256 endingBlock = lockBlock + durationDays * 6000;
+            uint256 endingBlock = lockBlock + durationDays * 7200;
             if (endingBlock > block.number) {
                 endingBlock = block.number;
             }
             // how many days have passed from initial lock or last claim
             // to the ending block?
-            uint256 lockDaysElapsed = (endingBlock - startingBlock) / 6000;
+            uint256 lockDaysElapsed = (endingBlock - startingBlock) / 7200;
             uint256 boost = lockBoostRates[durationIndex];
             // if the user has claimed since locking, account for that
             // by calculating `remainingDurationDays`
             uint256 remainingDurationDays = durationDays -
                 (depositBlock - lockBlock) /
-                6000;
+                7200;
             // if the remaining lock time hasn't elapsed, reward based on
             // elapsed days, otherwise reward based on `remainingDurationDays`.
             // in other worrds, cap rewards at the remaining lock time,
@@ -215,7 +215,7 @@ contract Staking is ERC721Holder, Ownable {
         }
         // how many days have elapsed since the NFT was deposited or
         // rewards were claimed?
-        uint256 depositDaysElapsed = (block.number - depositBlock) / 6000;
+        uint256 depositDaysElapsed = (block.number - depositBlock) / 7200;
         // calculate regular deposit rewards
         uint256 regularRewards = stakeRewardRate *
             depositDaysElapsed *
@@ -341,7 +341,7 @@ contract Staking is ERC721Holder, Ownable {
                     lockDurationsByTokenId[bgContract][tokenId]
                 ];
                 uint256 daysElapsed = (block.number -
-                    lockBlocks[bgContract][tokenId]) / 6000;
+                    lockBlocks[bgContract][tokenId]) / 7200;
                 require(daysElapsed >= duration, "token still locked");
             }
             _deposits[account][bgContract].remove(tokenId);
