@@ -65,17 +65,16 @@ contract StakingTest is DSTest {
 
     address USER_ADDRESS = address(1);
     address TRANSFER_ADDRESS = address(2);
-    address MARKETPLACE_ADDRESS = address(3);
-    address RANDO_ADDRESS = address(4);
-    address TEMP_STAKING_ADDRESS = address(5);
-    address USER_ADDRESS_TWO = address(6);
+    address RANDO_ADDRESS = address(3);
+    address TEMP_STAKING_ADDRESS = address(4);
+    address USER_ADDRESS_TWO = address(5);
 
     address BGK_ADDR = address(0xa5ae87B40076745895BB7387011ca8DE5fde37E0);
     address BGP_ADDR = address(0x86e9C5ad3D4b5519DA2D2C19F5c71bAa5Ef40933);
     address WHALE = address(0x521bC9Bb5Ab741658e48eF578D291aEe05DbA358);
 
     function setUp() public {
-        gumContract = new Gum(MARKETPLACE_ADDRESS, TEMP_STAKING_ADDRESS);
+        gumContract = new Gum(TEMP_STAKING_ADDRESS);
         stakingContract = new Staking(address(gumContract));
         gumContract.updateStaking(address(stakingContract));
 

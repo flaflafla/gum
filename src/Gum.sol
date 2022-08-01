@@ -22,8 +22,7 @@ contract Gum is ERC20, Ownable {
     );
     event StakingUpdated(address _staking);
 
-    constructor(address marketplace, address _staking) ERC20("Gum", "GUM") {
-        EnumerableSet.add(_transferAllowList, marketplace);
+    constructor(address _staking) ERC20("Gum", "GUM") {
         staking = _staking;
     }
 

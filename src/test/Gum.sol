@@ -26,8 +26,9 @@ contract GumTest is DSTest {
     address NEW_STAKING_ADDRESS = address(8);
 
     function setUp() public {
-        gumContract = new Gum(MARKETPLACE_ADDRESS, STAKING_ADDRESS);
+        gumContract = new Gum(STAKING_ADDRESS);
         gumContract.mint(USER_ADDRESS, 1_000_000);
+        gumContract.updateTransferAllowList(MARKETPLACE_ADDRESS, 0);
     }
 
     function testMarketplaceTransfer() public {
