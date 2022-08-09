@@ -6,6 +6,10 @@ import "../Gum.sol";
 
 interface CheatCodes {
     function prank(address) external;
+
+    function startPrank(address, address) external;
+
+    function stopPrank() external;
 }
 
 contract GumTest is DSTest {
@@ -18,11 +22,13 @@ contract GumTest is DSTest {
     address SPENDER_ADDRESS = address(4);
     address RANDO_ADDRESS = address(5);
     address NEW_MARKETPLACE_ADDRESS = address(6);
-    address NEW_STAKING_ADDRESS = address(7);
+    address ANOTHER_APPROVED_ADDRESS = address(7);
+    address NEW_STAKING_ADDRESS = address(8);
 
     function setUp() public {
-        gumContract = new Gum(MARKETPLACE_ADDRESS, STAKING_ADDRESS);
+        gumContract = new Gum(STAKING_ADDRESS);
         gumContract.mint(USER_ADDRESS, 1_000_000);
+        gumContract.updateTransferAllowList(MARKETPLACE_ADDRESS, 0);
     }
 
     function testMarketplaceTransfer() public {
@@ -37,6 +43,111 @@ contract GumTest is DSTest {
         assertTrue(success);
     }
 
+    function testFailAddToTransferAllowList() public {
+        cheats.prank(RANDO_ADDRESS);
+        gumContract.updateTransferAllowList(NEW_MARKETPLACE_ADDRESS, 0);
+    }
+
+    function testFailRemoveFromTransferAllowList() public {
+        cheats.prank(RANDO_ADDRESS);
+        gumContract.updateTransferAllowList(MARKETPLACE_ADDRESS, 1);
+    }
+
+    function testAddToTransferAllowList() public {
+        // get allow list length before
+        uint256 transferAllowListLengthBefore = gumContract
+            .getTransferAllowListLength();
+        assertEq(transferAllowListLengthBefore, 1);
+
+        // add new address
+        gumContract.updateTransferAllowList(NEW_MARKETPLACE_ADDRESS, 0);
+
+        // get list length after
+        uint256 transferAllowListLengthAfter = gumContract
+            .getTransferAllowListLength();
+        assertEq(transferAllowListLengthAfter, 2);
+
+        // check for address
+        address transferAllowListAtIndexZero = gumContract
+            .getTransferAllowListAtIndex(0);
+        address transferAllowListAtIndexOne = gumContract
+            .getTransferAllowListAtIndex(1);
+        bool listIncludesAddress = transferAllowListAtIndexZero ==
+            NEW_MARKETPLACE_ADDRESS ||
+            transferAllowListAtIndexOne == NEW_MARKETPLACE_ADDRESS;
+        assertTrue(listIncludesAddress);
+    }
+
+    function testRemoveFromTransferAllowList() public {
+        // setup: add address
+        gumContract.updateTransferAllowList(NEW_MARKETPLACE_ADDRESS, 0);
+
+        // get allow list length before
+        uint256 transferAllowListLengthBefore = gumContract
+            .getTransferAllowListLength();
+        assertEq(transferAllowListLengthBefore, 2);
+
+        // remove address
+        gumContract.updateTransferAllowList(NEW_MARKETPLACE_ADDRESS, 1);
+
+        // get allow list length after
+        uint256 transferAllowListLengthAfter = gumContract
+            .getTransferAllowListLength();
+        assertEq(transferAllowListLengthAfter, 1);
+    }
+
+    function testTransferAllowListFlow() public {
+        // add addresses
+        gumContract.updateTransferAllowList(NEW_MARKETPLACE_ADDRESS, 0);
+        gumContract.updateTransferAllowList(ANOTHER_APPROVED_ADDRESS, 0);
+
+        // transfer to them
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+        bool successOne = gumContract.transfer(NEW_MARKETPLACE_ADDRESS, 69);
+        assertTrue(successOne);
+        bool successTwo = gumContract.transfer(ANOTHER_APPROVED_ADDRESS, 420);
+        assertTrue(successTwo);
+        bool successThree = gumContract.transfer(MARKETPLACE_ADDRESS, 666);
+        assertTrue(successThree);
+        cheats.stopPrank();
+
+        // remove them
+        gumContract.updateTransferAllowList(NEW_MARKETPLACE_ADDRESS, 1);
+        gumContract.updateTransferAllowList(ANOTHER_APPROVED_ADDRESS, 1);
+
+        // check that they're gone
+        uint256 transferAllowListLength = gumContract
+            .getTransferAllowListLength();
+        assertEq(transferAllowListLength, 1);
+        address transferAllowListAtIndexZero = gumContract
+            .getTransferAllowListAtIndex(0);
+        assertEq(transferAllowListAtIndexZero, MARKETPLACE_ADDRESS);
+    }
+
+    function testFailTransferAllowListFlow() public {
+        // add an address
+        gumContract.updateTransferAllowList(NEW_MARKETPLACE_ADDRESS, 0);
+
+        // transfer to it
+        cheats.prank(USER_ADDRESS);
+        bool success = gumContract.transfer(NEW_MARKETPLACE_ADDRESS, 100);
+        assertTrue(success);
+
+        // remove it
+        gumContract.updateTransferAllowList(NEW_MARKETPLACE_ADDRESS, 1);
+
+        // check that it's gone
+        uint256 transferAllowListLength = gumContract
+            .getTransferAllowListLength();
+        assertEq(transferAllowListLength, 1);
+        address transferAllowListAtIndexZero = gumContract
+            .getTransferAllowListAtIndex(0);
+        assertEq(transferAllowListAtIndexZero, MARKETPLACE_ADDRESS);
+
+        // fail to transfer
+        gumContract.transfer(NEW_MARKETPLACE_ADDRESS, 101);
+    }
+
     function testOwnerMint() public {
         gumContract.mint(USER_ADDRESS, 100);
     }
@@ -49,19 +160,6 @@ contract GumTest is DSTest {
     function testFailMint() public {
         cheats.prank(RANDO_ADDRESS);
         gumContract.mint(USER_ADDRESS, 100);
-    }
-
-    function testUpdateMarketplace() public {
-        address oldMarketplace = gumContract.marketplace();
-        assertEq(oldMarketplace, MARKETPLACE_ADDRESS);
-        gumContract.updateMarkeplace(NEW_MARKETPLACE_ADDRESS);
-        address newMarketplace = gumContract.marketplace();
-        assertEq(newMarketplace, NEW_MARKETPLACE_ADDRESS);
-    }
-
-    function testFailUpdateMarketplace() public {
-        cheats.prank(RANDO_ADDRESS);
-        gumContract.updateMarkeplace(NEW_MARKETPLACE_ADDRESS);
     }
 
     function testUpdateStaking() public {

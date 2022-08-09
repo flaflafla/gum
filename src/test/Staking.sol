@@ -65,17 +65,16 @@ contract StakingTest is DSTest {
 
     address USER_ADDRESS = address(1);
     address TRANSFER_ADDRESS = address(2);
-    address MARKETPLACE_ADDRESS = address(3);
-    address RANDO_ADDRESS = address(4);
-    address TEMP_STAKING_ADDRESS = address(5);
-    address USER_ADDRESS_TWO = address(6);
+    address RANDO_ADDRESS = address(3);
+    address TEMP_STAKING_ADDRESS = address(4);
+    address USER_ADDRESS_TWO = address(5);
 
     address BGK_ADDR = address(0xa5ae87B40076745895BB7387011ca8DE5fde37E0);
     address BGP_ADDR = address(0x86e9C5ad3D4b5519DA2D2C19F5c71bAa5Ef40933);
     address WHALE = address(0x521bC9Bb5Ab741658e48eF578D291aEe05DbA358);
 
     function setUp() public {
-        gumContract = new Gum(MARKETPLACE_ADDRESS, TEMP_STAKING_ADDRESS);
+        gumContract = new Gum(TEMP_STAKING_ADDRESS);
         stakingContract = new Staking(address(gumContract));
         gumContract.updateStaking(address(stakingContract));
 
@@ -298,7 +297,7 @@ contract StakingTest is DSTest {
         stakingContract.deposit(tokenIds, bgContracts);
 
         // wait
-        cheats.roll(block.number + 6000);
+        cheats.roll(block.number + 7200);
 
         // try to redeposit
         stakingContract.deposit(tokenIds, bgContracts);
@@ -320,7 +319,7 @@ contract StakingTest is DSTest {
         stakingContract.deposit(tokenIds, bgContracts);
 
         // wait
-        cheats.roll(block.number + 6000);
+        cheats.roll(block.number + 7200);
 
         uint256[] memory durations = new uint256[](1);
         durations[0] = 1;
@@ -415,7 +414,7 @@ contract StakingTest is DSTest {
         stakingContract.deposit(tokenIds, bgContracts);
 
         uint256 daysElapsed = 100;
-        cheats.roll(block.number + 6000 * daysElapsed);
+        cheats.roll(block.number + 7200 * daysElapsed);
 
         stakingContract.withdraw(tokenIds, bgContracts);
 
@@ -458,7 +457,7 @@ contract StakingTest is DSTest {
         stakingContract.depositAndLock(tokenIds, durations, bgContracts);
 
         uint256 duration = stakingContract.lockDurationsConfig(3);
-        cheats.roll(block.number + 6000 * duration);
+        cheats.roll(block.number + 7200 * duration);
 
         stakingContract.withdraw(tokenIds, bgContracts);
 
@@ -495,7 +494,7 @@ contract StakingTest is DSTest {
 
         // roll forward, but not enough
         uint256 duration = stakingContract.lockDurationsConfig(2);
-        cheats.roll(block.number + 6000 * duration);
+        cheats.roll(block.number + 7200 * duration);
 
         // try to withdraw the jpeg
         stakingContract.withdraw(tokenIds, bgContracts);
@@ -624,8 +623,8 @@ contract StakingTest is DSTest {
         cheats.prank(USER_ADDRESS);
         stakingContract.deposit(tokenIds, bgContracts);
 
-        // roll forward 12,000 block (~two days)
-        cheats.roll(block.number + 12_000);
+        // roll forward 14,400 block (~two days)
+        cheats.roll(block.number + 14_400);
 
         uint256[] memory rewards = stakingContract.calculateRewards(
             USER_ADDRESS,
@@ -637,9 +636,9 @@ contract StakingTest is DSTest {
         assertEq(rewards[1], 2 * 10**18);
         assertEq(rewards[2], 2 * 10**18);
 
-        // roll forward 3000 blocks (~half a day)
+        // roll forward 3600 blocks (~half a day)
         // rewards will be unchanged
-        cheats.roll(block.number + 3000);
+        cheats.roll(block.number + 3600);
 
         rewards = stakingContract.calculateRewards(
             USER_ADDRESS,
@@ -652,7 +651,7 @@ contract StakingTest is DSTest {
         assertEq(rewards[2], 2 * 10**18);
 
         // roll forward another half day
-        cheats.roll(block.number + 3000);
+        cheats.roll(block.number + 3600);
 
         rewards = stakingContract.calculateRewards(
             USER_ADDRESS,
@@ -710,7 +709,7 @@ contract StakingTest is DSTest {
         stakingContract.depositAndLock(tokenIds, durations, bgContracts);
 
         // roll forward "two weeks"
-        cheats.roll(block.number + 6000 * 14);
+        cheats.roll(block.number + 7200 * 14);
 
         uint256[] memory rewards = stakingContract.calculateRewards(
             USER_ADDRESS,
@@ -744,7 +743,7 @@ contract StakingTest is DSTest {
         stakingContract.depositAndLock(tokenIds, durations, bgContracts);
 
         // roll forward "two weeks"
-        cheats.roll(block.number + 6000 * 14);
+        cheats.roll(block.number + 7200 * 14);
 
         cheats.prank(USER_ADDRESS);
         stakingContract.claimRewards();
@@ -769,7 +768,7 @@ contract StakingTest is DSTest {
         stakingContract.deposit(tokenIds, bgContracts);
 
         uint256 oldBlockNumber = block.number;
-        uint256 newBlockNumber = oldBlockNumber + 6000 * 14;
+        uint256 newBlockNumber = oldBlockNumber + 7200 * 14;
 
         uint256 depositBlock = stakingContract.depositBlocks(
             Staking.BGContract(bgContracts[0]),
@@ -812,7 +811,7 @@ contract StakingTest is DSTest {
         stakingContract.depositAndLock(tokenIds, durations, bgContracts);
 
         uint256 oldBlockNumber = block.number;
-        uint256 newBlockNumber = oldBlockNumber + 6000 * 31;
+        uint256 newBlockNumber = oldBlockNumber + 7200 * 31;
 
         uint256 lockBlockOne = stakingContract.lockBlocks(
             Staking.BGContract(bgContracts[0]),
@@ -865,7 +864,7 @@ contract StakingTest is DSTest {
         stakingContract.depositAndLock(tokenIds, durations, bgContracts);
 
         // roll forward a "week"
-        cheats.roll(block.number + 6000 * 7);
+        cheats.roll(block.number + 7200 * 7);
 
         uint256[][2] memory userLocks = stakingContract.locksOf(USER_ADDRESS);
         uint256 lockedTokenId = userLocks[bgContracts[0]][0];
@@ -880,14 +879,14 @@ contract StakingTest is DSTest {
             Staking.BGContract(bgContracts[0]),
             lockedTokenId
         );
-        uint256 daysSinceLock = (block.number - lockedTokenBlock) / 6000;
+        uint256 daysSinceLock = (block.number - lockedTokenBlock) / 7200;
         bool tokenIsExpired = daysSinceLock >= lockedTokenDurationInDays;
         assert(!tokenIsExpired);
 
         // roll forward past expiration
-        cheats.roll(block.number + 6000 * 84);
+        cheats.roll(block.number + 7200 * 84);
 
-        uint256 newDaysSinceLock = (block.number - lockedTokenBlock) / 6000;
+        uint256 newDaysSinceLock = (block.number - lockedTokenBlock) / 7200;
         bool newTokenIsExpired = newDaysSinceLock >= lockedTokenDurationInDays;
         assert(newTokenIsExpired);
 
@@ -928,7 +927,7 @@ contract StakingTest is DSTest {
         assertEq(locksBefore[bgContracts[0]][0], tokenIds[0]);
 
         // roll forward a "week"
-        cheats.roll(block.number + 6000 * 7);
+        cheats.roll(block.number + 7200 * 7);
 
         // relock for longer duration
         uint256[] memory extendedDurations = new uint256[](1);
@@ -977,7 +976,7 @@ contract StakingTest is DSTest {
         stakingContract.deposit(tokenIds, bgContracts);
 
         // roll forward "one week"
-        cheats.roll(block.number + 6000 * 7);
+        cheats.roll(block.number + 7200 * 7);
 
         // rewards so far: 7 gum
 
@@ -985,7 +984,7 @@ contract StakingTest is DSTest {
         stakingContract.lock(tokenIds, durations, bgContracts);
 
         // roll forward another "week"
-        cheats.roll(block.number + 6000 * 7);
+        cheats.roll(block.number + 7200 * 7);
 
         // rewards so far: 7 + 7 * 1.4 => 16.8 gum
 
@@ -1014,7 +1013,7 @@ contract StakingTest is DSTest {
         stakingContract.deposit(tokenIds, bgContracts);
 
         // roll forward "one week"
-        cheats.roll(block.number + 6000 * 7);
+        cheats.roll(block.number + 7200 * 7);
 
         // rewards so far: 7 gum
 
@@ -1022,7 +1021,7 @@ contract StakingTest is DSTest {
         stakingContract.lock(tokenIds, durations, bgContracts);
 
         // roll forward another "two months"
-        cheats.roll(block.number + 6000 * 60);
+        cheats.roll(block.number + 7200 * 60);
 
         // rewards so far: 7 + 30 * 1.1 + 30 => 70 gum
 
@@ -1052,21 +1051,21 @@ contract StakingTest is DSTest {
         stakingContract.depositAndLock(tokenIds, durations, bgContracts);
 
         // roll forward a "week"
-        cheats.roll(block.number + 6000 * 7);
+        cheats.roll(block.number + 7200 * 7);
 
         // rewards so far: 7 * 1.1 => 7.7 gum
 
         stakingContract.claimRewards();
 
         // roll forward another "week"
-        cheats.roll(block.number + 6000 * 7);
+        cheats.roll(block.number + 7200 * 7);
 
         // rewards so far: 2 * (7 * 1.1) => 15.4 gum
 
         stakingContract.claimRewards();
 
         // roll forward another "month"
-        cheats.roll(block.number + 6000 * 30);
+        cheats.roll(block.number + 7200 * 30);
 
         // rewards so far: 30 * 1.1 + 14 => 47 gum
 
