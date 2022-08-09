@@ -532,6 +532,35 @@ contract StakingTest is DSTest {
         cheats.stopPrank();
     }
 
+    // make sure it doesn't open a black hole or something
+    // (actually make sure you can withdraw immediately)
+    function testLockForZeroDays() public {
+        // deposit a jpeg
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = kidsIds[10];
+
+        uint8[] memory bgContracts = new uint8[](1);
+        bgContracts[0] = 0;
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+        stakingContract.deposit(tokenIds, bgContracts);
+
+        // cross the streams
+        uint256[] memory durations = new uint256[](1);
+        durations[0] = 0;
+
+        stakingContract.lock(tokenIds, durations, bgContracts);
+
+        // check locksOf
+        uint256[][2] memory locks = stakingContract.locksOf(USER_ADDRESS);
+        assertEq(locks[0][0], tokenIds[0]);
+
+        // withdraw immediately
+        stakingContract.withdraw(tokenIds, bgContracts);
+
+        cheats.stopPrank();
+    }
+
     // don't let a user lock jpegs that aren't deposited
     function testFailLock() public {
         uint256[] memory tokenIds = new uint256[](3);
@@ -604,6 +633,26 @@ contract StakingTest is DSTest {
 
         cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
 
+        stakingContract.depositAndLock(tokenIds, durations, bgContracts);
+
+        cheats.stopPrank();
+    }
+
+    // don't let a user deposit and lock jpegs they've already deposited
+    function testFailDepositAndLockAlreadyDeposited() public {
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = pupsIds[9];
+
+        uint8[] memory bgContracts = new uint8[](1);
+        bgContracts[0] = 1;
+
+        uint256[] memory durations = new uint256[](1);
+        durations[0] = 3;
+
+        cheats.startPrank(USER_ADDRESS, USER_ADDRESS);
+        stakingContract.deposit(tokenIds, bgContracts);
+
+        // nope
         stakingContract.depositAndLock(tokenIds, durations, bgContracts);
 
         cheats.stopPrank();
