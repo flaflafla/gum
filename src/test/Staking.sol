@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-// TODO: what happens if you lock for zero days?!?!?!?!?!??
-
 import "./console.sol";
 import "ds-test/test.sol";
 import "../Gum.sol";
