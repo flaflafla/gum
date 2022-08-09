@@ -185,9 +185,9 @@ contract Staking is ERC721Holder, Ownable {
             if (startingBlock < depositBlock) {
                 startingBlock = depositBlock;
             }
-            // `endingBlock` is when rewards stop accruing. this is either the
-            // block at which the lock expired, if it has expired, or the
-            // current block, if it hasn't
+            // `endingBlock` is when boosted rewards stop accruing. this is
+            // either the block at which the lock expired, if it has expired,
+            // or the current block, if it hasn't
             uint256 endingBlock = lockBlock + durationDays * 7200;
             if (endingBlock > block.number) {
                 endingBlock = block.number;
@@ -203,7 +203,7 @@ contract Staking is ERC721Holder, Ownable {
                 7200;
             // if the remaining lock time hasn't elapsed, reward based on
             // elapsed days, otherwise reward based on `remainingDurationDays`.
-            // in other worrds, cap rewards at the remaining lock time,
+            // in other words, cap rewards at the remaining lock time,
             // even if more time has elapsed since lock or last claim
             if (lockDaysElapsed < remainingDurationDays) {
                 boostedRewards = lockDaysElapsed * boost;
@@ -265,8 +265,11 @@ contract Staking is ERC721Holder, Ownable {
                 j = unsafe_inc(j)
             ) {
                 uint256 tokenId = _deposits[account][bgContract].at(j);
-                amount += (getRewardsForToken(account, tokenId, i));
-                depositBlocks[bgContract][tokenId] = block.number;
+                uint256 thisAmount = (getRewardsForToken(account, tokenId, i));
+                if (thisAmount > 0) {
+                    amount += thisAmount;
+                    depositBlocks[bgContract][tokenId] = block.number;
+                }
             }
         }
         if (amount > 0) {
@@ -468,7 +471,7 @@ contract Staking is ERC721Holder, Ownable {
      * @dev Combine the `deposit` and `lock` functions to save
      * users a transaction. Note that this function doesn't
      * claim rewards like `lock` does, since the NFTs aren't
-     * already staked. (If they are, function will error.)
+     * already staked. (If they are, the function will error.)
      * @param tokenIds The NFTs' ids
      * @param durations The durations for which the NFTs should
      * be locked, with indices corresponding to those of
