@@ -11,6 +11,31 @@
     "type": "constructor"
   },
   {
+    "inputs": [],
+    "name": "IndexOutOfRange",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidAction",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "OnlyOwnerOrStaking",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "UnapprovedRecipient",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "UpdateFailed",
+    "type": "error"
+  },
+  {
     "anonymous": false,
     "inputs": [
       {
@@ -231,7 +256,7 @@
         "type": "address"
       }
     ],
-    "stateMutability": "nonpayable",
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -244,7 +269,7 @@
         "type": "uint256"
       }
     ],
-    "stateMutability": "nonpayable",
+    "stateMutability": "view",
     "type": "function"
   },
   {

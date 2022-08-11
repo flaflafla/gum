@@ -12,6 +12,11 @@ interface IGum {
     function decimals() external returns (uint8);
 }
 
+error NotStarted();
+error TokenNotDeposited();
+error TokenStillLocked();
+error UnknownBGContract();
+
 /**
  * @notice Accept deposits of Bubblegum Kid and Bubblegum Puppy NFTs
  * ("staking") in exchange for GUM token rewards. Staked NFTs can
@@ -83,7 +88,7 @@ contract Staking is ERC721Holder, Ownable {
     }
 
     modifier onlyStarted() {
-        require(started, "not started");
+        if (!started) revert NotStarted();
         _;
     }
 
@@ -300,7 +305,7 @@ contract Staking is ERC721Holder, Ownable {
             } else if (bgContract == BGContract.BGP) {
                 bgContractAddress = BGP;
             } else {
-                revert("unknown contract address");
+                revert UnknownBGContract();
             }
             IERC721(bgContractAddress).safeTransferFrom(
                 account,
@@ -333,10 +338,9 @@ contract Staking is ERC721Holder, Ownable {
         for (uint256 i; i < tokenIds.length; i = unsafe_inc(i)) {
             uint256 tokenId = tokenIds[i];
             BGContract bgContract = BGContract(bgContracts[i]);
-            require(
-                _deposits[account][bgContract].contains(tokenId),
-                "token not deposited"
-            );
+            if (!_deposits[account][bgContract].contains(tokenId)) {
+                revert TokenNotDeposited();
+            }
             // if the token has an unexpired lock, don't allow
             // withdrawal
             if (_locks[account][bgContract].contains(tokenId)) {
@@ -345,7 +349,9 @@ contract Staking is ERC721Holder, Ownable {
                 ];
                 uint256 daysElapsed = (block.number -
                     lockBlocks[bgContract][tokenId]) / 7200;
-                require(daysElapsed >= duration, "token still locked");
+                if (daysElapsed < duration) {
+                    revert TokenStillLocked();
+                }
             }
             _deposits[account][bgContract].remove(tokenId);
             lockDurationsByTokenId[bgContract][tokenId] = 0;
@@ -356,7 +362,7 @@ contract Staking is ERC721Holder, Ownable {
             } else if (bgContract == BGContract.BGP) {
                 nftAddress = BGP;
             } else {
-                revert("unknown contract address");
+                revert UnknownBGContract();
             }
             IERC721(nftAddress).safeTransferFrom(
                 address(this),
@@ -424,10 +430,9 @@ contract Staking is ERC721Holder, Ownable {
         for (uint256 i; i < tokenIds.length; i = unsafe_inc(i)) {
             uint256 tokenId = tokenIds[i];
             BGContract bgContract = BGContract(bgContracts[i]);
-            require(
-                _deposits[account][bgContract].contains(tokenId),
-                "token not deposited"
-            );
+            if (!_deposits[account][bgContract].contains(tokenId)) {
+                revert TokenNotDeposited();
+            }
             _locks[account][bgContract].add(tokenId);
             lockDurationsByTokenId[bgContract][tokenId] = durations[i];
             lockBlocks[bgContract][tokenId] = block.number;
@@ -502,7 +507,7 @@ contract Staking is ERC721Holder, Ownable {
             } else if (bgContract == BGContract.BGP) {
                 nftAddress = BGP;
             } else {
-                revert("unknown contract address");
+                revert UnknownBGContract();
             }
             IERC721(nftAddress).safeTransferFrom(
                 account,

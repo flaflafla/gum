@@ -11,6 +11,26 @@
     "type": "constructor"
   },
   {
+    "inputs": [],
+    "name": "NotStarted",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "TokenNotDeposited",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "TokenStillLocked",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "UnknownBGContract",
+    "type": "error"
+  },
+  {
     "anonymous": false,
     "inputs": [
       {
