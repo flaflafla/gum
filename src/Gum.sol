@@ -5,6 +5,12 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+error IndexOutOfRange();
+error InvalidAction();
+error OnlyOwnerOrStaking();
+error UnapprovedRecipient();
+error UpdateFailed();
+
 contract Gum is ERC20, Ownable {
     using EnumerableSet for EnumerableSet.UintSet;
 
@@ -27,10 +33,9 @@ contract Gum is ERC20, Ownable {
     }
 
     modifier onlyOwnerOrStaking() {
-        require(
-            msg.sender == owner() || msg.sender == staking,
-            "only owner or staking can call"
-        );
+        if (msg.sender != owner() && msg.sender != staking) {
+            revert OnlyOwnerOrStaking();
+        }
         _;
     }
 
@@ -44,30 +49,31 @@ contract Gum is ERC20, Ownable {
         public
         onlyOwner
     {
-        require(_action < 2, "action is invalid");
+        if (_action > 1) revert InvalidAction();
         bool success;
         if (_action == 0) {
             success = EnumerableSet.add(_transferAllowList, _address);
         } else if (_action == 1) {
             success = EnumerableSet.remove(_transferAllowList, _address);
         }
-        require(success, "update failed");
+        if (!success) revert UpdateFailed();
         TransferAllowListAction action = TransferAllowListAction(_action);
         emit TransferAllowListUpdated(_address, action);
     }
 
-    function getTransferAllowListLength() public returns (uint256) {
+    function getTransferAllowListLength() public view returns (uint256) {
         return EnumerableSet.length(_transferAllowList);
     }
 
     function getTransferAllowListAtIndex(uint256 index)
         public
+        view
         returns (address)
     {
-        require(
-            index < EnumerableSet.length(_transferAllowList),
-            "index exceeds length"
-        );
+        uint256 transferAllowListLength = EnumerableSet.length(_transferAllowList);
+        if (index >= transferAllowListLength) {
+            revert IndexOutOfRange();
+        }
         return EnumerableSet.at(_transferAllowList, index);
     }
 
@@ -92,10 +98,9 @@ contract Gum is ERC20, Ownable {
         override
         returns (bool)
     {
-        require(
-            EnumerableSet.contains(_transferAllowList, to),
-            "can only send GUM to approved addresses"
-        );
+        if (!EnumerableSet.contains(_transferAllowList, to)) {
+            revert UnapprovedRecipient();
+        }
         return ERC20.transfer(to, amount);
     }
 
@@ -108,10 +113,9 @@ contract Gum is ERC20, Ownable {
         address to,
         uint256 amount
     ) public override returns (bool) {
-        require(
-            EnumerableSet.contains(_transferAllowList, to),
-            "can only send GUM to approved addresses"
-        );
+        if (!EnumerableSet.contains(_transferAllowList, to)) {
+            revert UnapprovedRecipient();
+        }
         return ERC20.transferFrom(from, to, amount);
     }
 }
