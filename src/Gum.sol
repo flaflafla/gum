@@ -70,8 +70,7 @@ contract Gum is ERC20, Ownable {
         view
         returns (address)
     {
-        uint256 transferAllowListLength = EnumerableSet.length(_transferAllowList);
-        if (index >= transferAllowListLength) {
+        if (index >= EnumerableSet.length(_transferAllowList)) {
             revert IndexOutOfRange();
         }
         return EnumerableSet.at(_transferAllowList, index);
