@@ -450,7 +450,28 @@ contract StakingTest is DSTest {
     }
 
     function testClaimRewards() public {
-        // TODO
+        // deposit and lock some jpegs
+        uint256[] memory tokenIds = new uint256[](3);
+        tokenIds[0] = kidsIds[2];
+        tokenIds[1] = pupsIds[1];
+        tokenIds[2] = pupsIds[2];
+
+        uint8[] memory bgContracts = new uint8[](3);
+        bgContracts[0] = 0;
+        bgContracts[1] = 1;
+        bgContracts[2] = 1;
+
+        cheats.prank(USER_ADDRESS);
+        stakingContract.deposit(tokenIds, bgContracts);
+
+        // roll forward "two weeks"
+        cheats.roll(block.number + 7200 * 14);
+
+        cheats.prank(USER_ADDRESS);
+        stakingContract.claimRewards();
+
+        uint256 gumBalance = gumContract.balanceOf(USER_ADDRESS);
+        assertEq(gumBalance, (3 * 14) * (10**18));
     }
 
     // make sure that after claiming rewards, deposit block
