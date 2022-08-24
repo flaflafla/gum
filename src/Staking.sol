@@ -126,9 +126,7 @@ contract Staking is ERC721Holder, Ownable {
         // how many days have elapsed since the NFT was deposited or
         // rewards were claimed?
         uint256 depositDaysElapsed = (block.number - depositBlock) / 7200;
-        return stakeRewardRate *
-            depositDaysElapsed *
-            10**GUM_TOKEN_DECIMALS;
+        return stakeRewardRate * depositDaysElapsed * 10**GUM_TOKEN_DECIMALS;
     }
 
     /**
