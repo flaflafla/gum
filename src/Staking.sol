@@ -48,7 +48,7 @@ contract Staking is ERC721Holder, Ownable {
     event Started();
     event Stopped();
     event Deposited(address from, uint256[] tokenIds, uint8[] bgContracts);
-    event Withdrawn(address to, uint256[] tokenIds);
+    event Withdrawn(address to, uint256[] tokenIds, uint8[] bgContracts);
     event StakeRewardRateUpdated(uint256 _stakeRewardRate);
     event RewardClaimed(address to, uint256 amount);
 
@@ -259,7 +259,7 @@ contract Staking is ERC721Holder, Ownable {
                 ""
             );
         }
-        emit Withdrawn(account, tokenIds);
+        emit Withdrawn(account, tokenIds, bgContracts);
     }
 
     /**
