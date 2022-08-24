@@ -14,14 +14,11 @@ interface IGum {
 
 error NotStarted();
 error TokenNotDeposited();
-error TokenStillLocked();
 error UnknownBGContract();
 
 /**
  * @notice Accept deposits of Bubblegum Kid and Bubblegum Puppy NFTs
- * ("staking") in exchange for GUM token rewards. Staked NFTs can
- * also be "locked," preventing their withdrawal for a period of time
- * in exchange for accelerated rewards. Thanks to the Sappy Seals team:
+ * ("staking") in exchange for GUM token rewards. Thanks to the Sappy Seals team:
  * this contract is largely based on their staking contract at
  * 0xdf8A88212FF229446e003f8f879e263D3616b57A.
  * @dev Contract defines a "day" as 7200 ethereum blocks.
@@ -47,42 +44,16 @@ contract Staking is ERC721Holder, Ownable {
     mapping(BGContract => mapping(uint256 => uint256)) public depositBlocks;
     uint256 public stakeRewardRate;
 
-    mapping(address => mapping(BGContract => EnumerableSet.UintSet))
-        private _locks;
-    mapping(BGContract => mapping(uint256 => uint256)) public lockBlocks;
-    mapping(BGContract => mapping(uint256 => uint256))
-        public lockDurationsByTokenId;
-    // in "days" (multiples of 7200 blocks)
-    uint256[4] public lockDurationsConfig;
-    // decimals == 3
-    uint256[4] public lockBoostRates;
-
     event GumTokenUpdated(address _gumToken);
     event Started();
     event Stopped();
     event Deposited(address from, uint256[] tokenIds, uint8[] bgContracts);
-    event Withdrawn(address to, uint256[] tokenIds);
+    event Withdrawn(address to, uint256[] tokenIds, uint8[] bgContracts);
     event StakeRewardRateUpdated(uint256 _stakeRewardRate);
-    event Locked(
-        address from,
-        uint256[] tokenIds,
-        uint256[] durations,
-        uint8[] bgContracts
-    );
-    event DepositedAndLocked(
-        address from,
-        uint256[] tokenIds,
-        uint256[] durations,
-        uint8[] bgContracts
-    );
-    event LockBoostRatesUpdated(uint256 lockBoostRate, uint256 index);
-    event LockDurationsConfigUpdated(uint256 lockDuration, uint256 index);
     event RewardClaimed(address to, uint256 amount);
 
     constructor(address _gumToken) {
         gumToken = _gumToken;
-        lockBoostRates = [0, 100, 250, 400];
-        lockDurationsConfig = [0, 30, 90, 180];
         stakeRewardRate = 1;
         started = false;
     }
@@ -116,22 +87,6 @@ contract Staking is ERC721Holder, Ownable {
     function updateGumToken(address _gumToken) public onlyOwner {
         gumToken = _gumToken;
         emit GumTokenUpdated(_gumToken);
-    }
-
-    function updateLockBoostRates(uint256 lockBoostRate, uint256 index)
-        public
-        onlyOwner
-    {
-        lockBoostRates[index] = lockBoostRate;
-        emit LockBoostRatesUpdated(lockBoostRate, index);
-    }
-
-    function updateLockDurationsConfig(uint256 lockDuration, uint256 index)
-        public
-        onlyOwner
-    {
-        lockDurationsConfig[index] = lockDuration;
-        emit LockDurationsConfigUpdated(lockDuration, index);
     }
 
     function updateStakeRewardRate(uint256 _stakeRewardRate) public onlyOwner {
@@ -168,64 +123,10 @@ contract Staking is ERC721Holder, Ownable {
         }
         // when was the NFT deposited?
         uint256 depositBlock = depositBlocks[bgContract][tokenId];
-        // separately calculate `boostedRewards` (for locked NFTs) and
-        // `regularRewards` (for NFTs that have been staked but not
-        // locked -- see below). add them together to find total rewards
-        uint256 boostedRewards;
-        // is (or was) the NFT locked?
-        if (_locks[account][bgContract].contains(tokenId)) {
-            // when was the NFT locked?
-            uint256 lockBlock = lockBlocks[bgContract][tokenId];
-            // `durationIndex` is used to access values on `lockDurationsConfig`
-            // and `lockBoostRates`
-            uint256 durationIndex = lockDurationsByTokenId[bgContract][tokenId];
-            // how many days was the NFT locked for?
-            uint256 durationDays = lockDurationsConfig[durationIndex];
-            // `startingBlock` is the block when token rewards began accruing.
-            // this could be the block at which the token was locked,
-            // or it could be the block at which the user last claimed
-            // rewards (which is tracked by updates to `depositBlocks`
-            // -- see `claimRewards`)
-            uint256 startingBlock = lockBlock;
-            if (startingBlock < depositBlock) {
-                startingBlock = depositBlock;
-            }
-            // `endingBlock` is when boosted rewards stop accruing. this is
-            // either the block at which the lock expired, if it has expired,
-            // or the current block, if it hasn't
-            uint256 endingBlock = lockBlock + durationDays * 7200;
-            if (endingBlock > block.number) {
-                endingBlock = block.number;
-            }
-            // how many days have passed from initial lock or last claim
-            // to the ending block?
-            uint256 lockDaysElapsed = (endingBlock - startingBlock) / 7200;
-            uint256 boost = lockBoostRates[durationIndex];
-            // if the user has claimed since locking, account for that
-            // by calculating `remainingDurationDays`
-            uint256 remainingDurationDays = durationDays -
-                (depositBlock - lockBlock) /
-                7200;
-            // if the remaining lock time hasn't elapsed, reward based on
-            // elapsed days, otherwise reward based on `remainingDurationDays`.
-            // in other words, cap rewards at the remaining lock time,
-            // even if more time has elapsed since lock or last claim
-            if (lockDaysElapsed < remainingDurationDays) {
-                boostedRewards = lockDaysElapsed * boost;
-            } else {
-                boostedRewards = remainingDurationDays * boost;
-            }
-            // calculate boosted rewards
-            boostedRewards = (boostedRewards * 10**GUM_TOKEN_DECIMALS) / 1000;
-        }
         // how many days have elapsed since the NFT was deposited or
         // rewards were claimed?
         uint256 depositDaysElapsed = (block.number - depositBlock) / 7200;
-        // calculate regular deposit rewards
-        uint256 regularRewards = stakeRewardRate *
-            depositDaysElapsed *
-            10**GUM_TOKEN_DECIMALS;
-        return regularRewards + boostedRewards;
+        return stakeRewardRate * depositDaysElapsed * 10**GUM_TOKEN_DECIMALS;
     }
 
     /**
@@ -323,8 +224,7 @@ contract Staking is ERC721Holder, Ownable {
      * @dev Withdraw ("unstake") a set of deposited BGK and BGP
      * NFTs. Calling `withdraw` automatically claims accrued
      * rewards on the NFTs supplied as arguments. Caller must
-     * have deposited the NFTs, and they must not be subject
-     * to unexpired locks.
+     * have deposited the NFTs.
      * @param tokenIds The NFTs' ids
      * @param bgContracts The NFTs' contracts -- Kids (0)
      * or Puppies (1) -- with indices corresponding to those
@@ -341,21 +241,7 @@ contract Staking is ERC721Holder, Ownable {
             if (!_deposits[account][bgContract].contains(tokenId)) {
                 revert TokenNotDeposited();
             }
-            // if the token has an unexpired lock, don't allow
-            // withdrawal
-            if (_locks[account][bgContract].contains(tokenId)) {
-                uint256 duration = lockDurationsConfig[
-                    lockDurationsByTokenId[bgContract][tokenId]
-                ];
-                uint256 daysElapsed = (block.number -
-                    lockBlocks[bgContract][tokenId]) / 7200;
-                if (daysElapsed < duration) {
-                    revert TokenStillLocked();
-                }
-            }
             _deposits[account][bgContract].remove(tokenId);
-            lockDurationsByTokenId[bgContract][tokenId] = 0;
-            _locks[account][bgContract].remove(tokenId);
             address nftAddress;
             if (bgContract == BGContract.BGK) {
                 nftAddress = BGK;
@@ -371,7 +257,7 @@ contract Staking is ERC721Holder, Ownable {
                 ""
             );
         }
-        emit Withdrawn(account, tokenIds);
+        emit Withdrawn(account, tokenIds, bgContracts);
     }
 
     /**
@@ -402,120 +288,5 @@ contract Staking is ERC721Holder, Ownable {
             bgpIds[i] = bgpDepositSet.at(i);
         }
         return [bgkIds, bgpIds];
-    }
-
-    /**
-     * @dev Lock a set of deposited BGK and BGP NFTs. This
-     * will prevent them from being withdrawn for the
-     * periods of time supplied (indirectly) via the `durations`
-     * argument, in exchange for accelerated rewards (see
-     * `lockBoostRates`). Caller must have deposited the NFTs.
-     * @param tokenIds The NFTs' ids
-     * @param durations The durations for which the NFTs should
-     * be locked, with indices corresponding to those of
-     * `tokenIds`. Each "duration" represents an index that will
-     * be used to access values on `lockDurationsConfig` and
-     * `lockBoostRates`
-     * @param bgContracts The NFTs' contracts -- Kids (0)
-     * or Puppies (1) -- with indices corresponding to those
-     * of `tokenIds`
-     */
-    function lock(
-        uint256[] calldata tokenIds,
-        uint256[] calldata durations,
-        uint8[] calldata bgContracts
-    ) external onlyStarted {
-        claimRewards();
-        address account = msg.sender;
-        for (uint256 i; i < tokenIds.length; i = unsafe_inc(i)) {
-            uint256 tokenId = tokenIds[i];
-            BGContract bgContract = BGContract(bgContracts[i]);
-            if (!_deposits[account][bgContract].contains(tokenId)) {
-                revert TokenNotDeposited();
-            }
-            _locks[account][bgContract].add(tokenId);
-            lockDurationsByTokenId[bgContract][tokenId] = durations[i];
-            lockBlocks[bgContract][tokenId] = block.number;
-        }
-        emit Locked(account, tokenIds, durations, bgContracts);
-    }
-
-    /**
-     * @dev Get the ids of Kid and Puppy NFTs locked by the
-     * user supplied in the `account` argument, whether the
-     * locks are expired or not. Use `lockDurationsByTokenId`
-     * to determine whether a lock has expired.
-     * @param account The depositor's ethereum address
-     * @return bgContracts The ids of the locked NFTs,
-     * as an array: the first item is an array of Kid ids,
-     * the second an array of Pup ids
-     */
-    function locksOf(address account)
-        external
-        view
-        returns (uint256[][2] memory)
-    {
-        EnumerableSet.UintSet storage bgkLockSet = _locks[account][
-            BGContract.BGK
-        ];
-        uint256[] memory bgkIds = new uint256[](bgkLockSet.length());
-        for (uint256 i; i < bgkLockSet.length(); i = unsafe_inc(i)) {
-            bgkIds[i] = bgkLockSet.at(i);
-        }
-        EnumerableSet.UintSet storage bgpLockSet = _locks[account][
-            BGContract.BGP
-        ];
-        uint256[] memory bgpIds = new uint256[](bgpLockSet.length());
-        for (uint256 i; i < bgpLockSet.length(); i = unsafe_inc(i)) {
-            bgpIds[i] = bgpLockSet.at(i);
-        }
-        return [bgkIds, bgpIds];
-    }
-
-    /**
-     * @dev Combine the `deposit` and `lock` functions to save
-     * users a transaction. Note that this function doesn't
-     * claim rewards like `lock` does, since the NFTs aren't
-     * already staked. (If they are, the function will error.)
-     * @param tokenIds The NFTs' ids
-     * @param durations The durations for which the NFTs should
-     * be locked, with indices corresponding to those of
-     * `tokenIds`. Each "duration" represents an index that will
-     * be used to access values on `lockDurationsConfig` and
-     * `lockBoostRates`
-     * @param bgContracts The NFTs' contracts -- Kids (0)
-     * or Puppies (1) -- with indices corresponding to those
-     * of `tokenIds`
-     */
-    function depositAndLock(
-        uint256[] calldata tokenIds,
-        uint256[] calldata durations,
-        uint8[] calldata bgContracts
-    ) external onlyStarted {
-        address account = msg.sender;
-        for (uint256 i; i < tokenIds.length; i = unsafe_inc(i)) {
-            uint256 tokenId = tokenIds[i];
-            BGContract bgContract = BGContract(bgContracts[i]);
-            _deposits[account][bgContract].add(tokenId);
-            depositBlocks[bgContract][tokenId] = block.number;
-            _locks[account][bgContract].add(tokenId);
-            lockDurationsByTokenId[bgContract][tokenId] = durations[i];
-            lockBlocks[bgContract][tokenId] = block.number;
-            address nftAddress;
-            if (bgContract == BGContract.BGK) {
-                nftAddress = BGK;
-            } else if (bgContract == BGContract.BGP) {
-                nftAddress = BGP;
-            } else {
-                revert UnknownBGContract();
-            }
-            IERC721(nftAddress).safeTransferFrom(
-                account,
-                address(this),
-                tokenId,
-                ""
-            );
-        }
-        emit DepositedAndLocked(account, tokenIds, durations, bgContracts);
     }
 }
