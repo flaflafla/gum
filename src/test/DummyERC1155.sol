@@ -10,7 +10,7 @@ contract DummyERC1155 is ERC1155 {
 
     function mint(address to, uint256 count) public {
         for (uint256 i = 0; i < count; i++) {
-            _mint(to, nextTokenId, 5, '');
+            _mint(to, nextTokenId, 5, "");
             nextTokenId++;
         }
     }

@@ -132,7 +132,7 @@ contract Marketplace is ERC1155Holder, ERC721Holder, Ownable {
         if (_tokenStandard > 1) revert UnknownTokenStandard();
         if (_tokenContract == address(0)) revert ZeroTokenContract();
         TokenStandard tokenStandard = TokenStandard(_tokenStandard);
-        return _prices[tokenStandard][_tokenContract][tokenId] * 10**18;
+        return _prices[tokenStandard][_tokenContract][tokenId];
     }
 
     function purchaseItem(
