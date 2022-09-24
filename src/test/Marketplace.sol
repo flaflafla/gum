@@ -287,8 +287,28 @@ contract MarketplaceTest is DSTest {
         );
     }
 
-    // function testWithdrawERC1155() public {
-    // }
+    function testWithdrawERC1155() public {
+        uint256 tokenId = 9;
+        cheats.prank(USER_ADDRESS);
+        dummyERC1155One.safeTransferFrom(
+            USER_ADDRESS,
+            marketplaceAddress,
+            tokenId,
+            5,
+            ''
+        );
+        uint256 oldBalance = dummyERC1155One.balanceOf(marketplaceAddress, tokenId);
+        assertEq(oldBalance, 5);
+        cheats.prank(OWNER_ADDRESS);
+        marketplaceContract.withdrawItems(
+            0,
+            dummyERC1155OneAddress,
+            tokenId,
+            3
+        );
+        uint256 newBalance = dummyERC1155One.balanceOf(marketplaceAddress, tokenId);
+        assertEq(newBalance, 2);
+    }
 
     // // don't let non-owner withdraw ERC1155
     // function testFailWithdrawERC1155ByNonOwner() public {
