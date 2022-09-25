@@ -1,13 +1,40 @@
 # gum
 
-## token
+## mainnet contracts
+
+### bubblegum kids
+
+`src/nft-contracts/BubblegumKids.sol`
+
+[0xa5ae87B40076745895BB7387011ca8DE5fde37E0](https://ropsten.etherscan.io/address/0xa5ae87B40076745895BB7387011ca8DE5fde37E0#code)
+
+### bubblegum puppies
+
+`src/nft-contracts/Puppies.sol`
+
+[0x86e9C5ad3D4b5519DA2D2C19F5c71bAa5Ef40933](https://ropsten.etherscan.io/address/0x86e9C5ad3D4b5519DA2D2C19F5c71bAa5Ef40933#code)
+
+## testnet contracts (ropsten)
+###  gum token
 
 `src/Gum.sol`
 
-deployed/verified on kovan testnet at [0xe5f1433b6eCc6bE74E413b54f4c1eA2671b1cA0F](https://kovan.etherscan.io/address/0xe5f1433b6ecc6be74e413b54f4c1ea2671b1ca0f#code)
+[0xd790010E83E1E12662DB736B72F5496F1bE2BcF5](https://ropsten.etherscan.io/address/0xd790010E83E1E12662DB736B72F5496F1bE2BcF5#code)
 
-## staking
+### staking
 
 `src/Staking.sol`
 
-deployed/verified on kovan testnet at [0x5CdfD0B428b47AEB9Ba307355dA1e7971c62fa06](https://kovan.etherscan.io/address/0x5CdfD0B428b47AEB9Ba307355dA1e7971c62fa06#code)
+[0x15F9053453c057Dfed554E54117f49b1EB82babf](https://ropsten.etherscan.io/address/0x15F9053453c057Dfed554E54117f49b1EB82babf#code)
+
+### bubblegum kids
+
+`src/nft-contracts/BubblegumKids.sol`
+
+[0xf48415039913DBdF17e337e681de922A9cb04010](https://ropsten.etherscan.io/address/0xf48415039913DBdF17e337e681de922A9cb04010#code)
+
+### bubblegum puppies
+
+`src/nft-contracts/Puppies.sol`
+
+[0x053A3213E75b78c0b80b2f88e243cf519e834c02](https://ropsten.etherscan.io/address/0x053A3213E75b78c0b80b2f88e243cf519e834c02#code)
