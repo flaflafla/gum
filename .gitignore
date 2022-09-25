@@ -5,3 +5,4 @@ notes
 credentials.json
 scripts/logs/*.txt
 *.sql
+scripts/comicEmailScript.js
