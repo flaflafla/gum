@@ -4,13 +4,9 @@
 
 ### bubblegum kids
 
-`src/nft-contracts/BubblegumKids.sol`
-
 [0xa5ae87B40076745895BB7387011ca8DE5fde37E0](https://ropsten.etherscan.io/address/0xa5ae87B40076745895BB7387011ca8DE5fde37E0#code)
 
 ### bubblegum puppies
-
-`src/nft-contracts/Puppies.sol`
 
 [0x86e9C5ad3D4b5519DA2D2C19F5c71bAa5Ef40933](https://ropsten.etherscan.io/address/0x86e9C5ad3D4b5519DA2D2C19F5c71bAa5Ef40933#code)
 
