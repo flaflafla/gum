@@ -18,16 +18,15 @@ error UnknownBGContract();
 
 /**
  * @notice Accept deposits of Bubblegum Kid and Bubblegum Puppy NFTs
- * ("staking") in exchange for GUM token rewards. Thanks to the Sappy Seals team:
- * this contract is largely based on their staking contract at
- * 0xdf8A88212FF229446e003f8f879e263D3616b57A.
+ * ("staking") in exchange for GUM token rewards. Thanks to the Sappy Seals team,
+ * this contract is largely based on their work
  * @dev Contract defines a "day" as 7200 ethereum blocks.
  */
 contract Staking is ERC721Holder, Ownable {
     using EnumerableSet for EnumerableSet.UintSet;
 
-    address public constant BGK = 0xf48415039913DBdF17e337e681de922A9cb04010;
-    address public constant BGP = 0xeb856faBa11a7590Cb347816Db8F8C08D30FB0fA;
+    address public constant BGK = 0xa5ae87B40076745895BB7387011ca8DE5fde37E0;
+    address public constant BGP = 0x86e9C5ad3D4b5519DA2D2C19F5c71bAa5Ef40933;
     enum BGContract {
         BGK,
         BGP
