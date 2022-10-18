@@ -370,6 +370,21 @@ contract StakingTest is DSTest {
         stakingContract.withdraw(tokenIds, bgContracts);
     }
 
+    // don't let a user withdraw a jpeg someone else deposited
+    function testFailWithdrawToSteal() public {
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = kidsIds[2];
+
+        uint8[] memory bgContracts = new uint8[](1);
+        bgContracts[0] = 0;
+
+        cheats.prank(USER_ADDRESS);
+        stakingContract.deposit(tokenIds, bgContracts);
+
+        cheats.prank(RANDO_ADDRESS);
+        stakingContract.withdraw(tokenIds, bgContracts);
+    }
+
     function testCalculateRewards() public {
         uint256[] memory tokenIds = new uint256[](3);
         tokenIds[0] = kidsIds[0];
