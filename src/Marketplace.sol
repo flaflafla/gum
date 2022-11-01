@@ -1,12 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
+import "@chainlink/v0.8/ConfirmedOwner.sol";
+import "@chainlink/v0.8/VRFV2WrapperConsumerBase.sol";
+
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+uint32 constant CALLBACK_GAS_LIMIT = 100000;
+uint16 constant RANDOMNESS_REQUEST_CONFIRMATIONS = 3;
+uint32 constant NUM_RANDOM_WORDS = 2;
+address constant GOERLI_LINK_ADDRESS = 0x326C977E6efc84E512bB9C30f76E30c160eD06FB;
+address constant GOERLI_WRAPPER_ADDRESS = 0x708701a1DfF4f478de54383E49a627eD4852C816;
 
 error InsufficientFunds();
 error InsufficientSupply();
@@ -17,7 +26,14 @@ error ZeroPurchasePrice();
 error ZeroQuantity();
 error ZeroTokenContract();
 
-contract Marketplace is ERC1155Holder, ERC721Holder, Ownable {
+// TODO: make it not broken
+contract Marketplace is
+    ConfirmedOwner,
+    ERC1155Holder,
+    ERC721Holder,
+    Ownable,
+    VRFV2WrapperConsumerBase
+{
     enum PrizeType {
         META, // nft prize
         IRL // physical merch or other offchain prize
@@ -43,12 +59,23 @@ contract Marketplace is ERC1155Holder, ERC721Holder, Ownable {
         PrizeType prizeType;
     }
 
+    struct RandomnessRequestStatus {
+        uint256 paid;
+        bool fulfilled;
+        uint256[] randomWords;
+    }
+
     address public gumToken;
     uint256 nextRaffleId = 0;
     // standard (ERC1155 or ERC721) => contract address => token id => price
     mapping(TokenStandard => mapping(address => mapping(uint256 => uint256)))
         private _prices;
     mapping(uint256 => Raffle) private _raffles;
+    mapping(uint256 => RandomnessRequestStatus)
+        public randomnessRequestStatuses;
+
+    uint256[] public randomnessRequestIds;
+    uint256 public lastRandomnessRequestId;
 
     event GumTokenUpdated(address _gumToken);
     event ItemListed(
@@ -66,9 +93,73 @@ contract Marketplace is ERC1155Holder, ERC721Holder, Ownable {
         uint256 price // total paid for all items, not price per item
     );
     event RaffleCreated(Raffle raffle);
+    event RandomnessRequestSent(uint256 requestId, uint32 numWords);
+    event RandomnessRequestFulfilled(
+        uint256 requestId,
+        uint256[] randomWords,
+        uint256 payment
+    );
 
-    constructor(address _gumToken) {
+    constructor(address _gumToken)
+        ConfirmedOwner(msg.sender)
+        VRFV2WrapperConsumerBase(GOERLI_LINK_ADDRESS, GOERLI_WRAPPER_ADDRESS)
+    {
         gumToken = _gumToken;
+    }
+
+    function requestRandomWords()
+        external
+        onlyOwner
+        returns (uint256 requestId)
+    {
+        requestId = requestRandomness(
+            CALLBACK_GAS_LIMIT,
+            RANDOMNESS_REQUEST_CONFIRMATIONS,
+            NUM_RANDOM_WORDS
+        );
+        randomnessRequestStatuses[requestId] = RandomnessRequestStatus({
+            paid: VRF_V2_WRAPPER.calculateRequestPrice(CALLBACK_GAS_LIMIT),
+            randomWords: new uint256[](0),
+            fulfilled: false
+        });
+        randomnessRequestIds.push(requestId);
+        lastRandomnessRequestId = requestId;
+        emit RandomnessRequestSent(requestId, NUM_RANDOM_WORDS);
+        return requestId;
+    }
+
+    function fulfillRandomWords(
+        uint256 _requestId,
+        uint256[] memory _randomWords
+    ) internal override {
+        require(
+            randomnessRequestStatuses[_requestId].paid > 0,
+            "request not found"
+        );
+        randomnessRequestStatuses[_requestId].fulfilled = true;
+        randomnessRequestStatuses[_requestId].randomWords = _randomWords;
+        emit RandomnessRequestFulfilled(
+            _requestId,
+            _randomWords,
+            randomnessRequestStatuses[_requestId].paid
+        );
+    }
+
+    function getRequestStatus(uint256 _requestId)
+        external
+        view
+        returns (
+            uint256 paid,
+            bool fulfilled,
+            uint256[] memory randomWords
+        )
+    {
+        require(
+            randomnessRequestStatuses[_requestId].paid > 0,
+            "request not found"
+        );
+        RandomnessRequestStatus memory request = randomnessRequestStatuses[_requestId];
+        return (request.paid, request.fulfilled, request.randomWords);
     }
 
     function updateGumToken(address _gumToken) public onlyOwner {

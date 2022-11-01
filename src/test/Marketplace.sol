@@ -259,12 +259,7 @@ contract MarketplaceTest is DSTest {
         address oldOwner = dummyERC721One.ownerOf(tokenId);
         assertEq(oldOwner, marketplaceAddress);
         cheats.prank(OWNER_ADDRESS);
-        marketplaceContract.withdrawItems(
-            1,
-            dummyERC721OneAddress,
-            tokenId,
-            1
-        );
+        marketplaceContract.withdrawItems(1, dummyERC721OneAddress, tokenId, 1);
         address newOwner = dummyERC721One.ownerOf(tokenId);
         assertEq(newOwner, OWNER_ADDRESS);
     }
@@ -279,12 +274,7 @@ contract MarketplaceTest is DSTest {
             tokenId
         );
         cheats.prank(RANDO_ADDRESS);
-        marketplaceContract.withdrawItems(
-            1,
-            dummyERC721OneAddress,
-            tokenId,
-            1
-        );
+        marketplaceContract.withdrawItems(1, dummyERC721OneAddress, tokenId, 1);
     }
 
     function testWithdrawERC1155() public {
@@ -295,9 +285,12 @@ contract MarketplaceTest is DSTest {
             marketplaceAddress,
             tokenId,
             5,
-            ''
+            ""
         );
-        uint256 oldBalance = dummyERC1155One.balanceOf(marketplaceAddress, tokenId);
+        uint256 oldBalance = dummyERC1155One.balanceOf(
+            marketplaceAddress,
+            tokenId
+        );
         assertEq(oldBalance, 5);
         cheats.prank(OWNER_ADDRESS);
         marketplaceContract.withdrawItems(
@@ -306,7 +299,10 @@ contract MarketplaceTest is DSTest {
             tokenId,
             3
         );
-        uint256 newBalance = dummyERC1155One.balanceOf(marketplaceAddress, tokenId);
+        uint256 newBalance = dummyERC1155One.balanceOf(
+            marketplaceAddress,
+            tokenId
+        );
         assertEq(newBalance, 2);
     }
 
